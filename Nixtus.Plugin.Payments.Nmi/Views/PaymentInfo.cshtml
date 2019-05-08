@@ -7,38 +7,36 @@
 @using Nixtus.Plugin.Payments.Nmi
 @model Nixtus.Plugin.Payments.Nmi.Models.PaymentInfoModel
 
-<form>
-    <table width="100%" cellspacing="2" cellpadding="1" border="0">
-        <tr>
-            <td>
-                @Html.LabelFor(model => model.CardholderName, false):
-            </td>
-            <td>
-                @Html.TextBoxFor(model => model.CardholderName, new { style = "Width: 165px;", autocomplete = "off" })
-                @Html.ValidationMessageFor(model => model.CardholderName)
-            </td>
-        </tr>
-        <tr>
-            <td>
-                @Html.LabelFor(model => model.CardNumber, false):
-            </td>
-            <td id="ccnumber"></td>
-        </tr>
-        <tr>
-            <td>
-                @Html.LabelFor(model => model.ExpireMonth, false):
-            </td>
-            <td id="ccexp"></td>
-        </tr>
-        <tr>
-            <td>
-                @Html.LabelFor(model => model.CardCode, false):
-            </td>
-            <td id="cvv"></td>
-        </tr>
-    </table>
-    <input type="hidden" name="Token" id="Token" asp-for="Token">
-</form>
+<table width="100%" cellspacing="2" cellpadding="1" border="0">
+    <tr>
+        <td>
+            @Html.LabelFor(model => model.CardholderName, false):
+        </td>
+        <td>
+            @Html.TextBoxFor(model => model.CardholderName, new { style = "Width: 165px;", autocomplete = "off" })
+            @Html.ValidationMessageFor(model => model.CardholderName)
+        </td>
+    </tr>
+    <tr>
+        <td>
+            @Html.LabelFor(model => model.CardNumber, false):
+        </td>
+        <td id="ccnumber"></td>
+    </tr>
+    <tr>
+        <td>
+            @Html.LabelFor(model => model.ExpireMonth, false):
+        </td>
+        <td id="ccexp"></td>
+    </tr>
+    <tr>
+        <td>
+            @Html.LabelFor(model => model.CardCode, false):
+        </td>
+        <td id="cvv"></td>
+    </tr>
+</table>
+<input type="hidden" name="Token" id="Token" asp-for="Token">
 
 <script>
     function addScript() {
@@ -46,13 +44,9 @@
         s.setAttribute('src', 'https://secure.networkmerchants.com/token/Collect.js');
         s.setAttribute('data-tokenization-key', '@nmiPaymentSettings.CollectJsTokenizationKey');
         s.onload = () => {
-            console.log('done');
-            console.log(CollectJS);
-
             CollectJS.configure({
                 variant: 'inline',
                 callback: (response) => {
-                    console.log('response', response.token);
                     $('#@Html.IdFor(model => model.Token)').val(response.token);
                     PaymentInfo.save();
                 }

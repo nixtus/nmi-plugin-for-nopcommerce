@@ -1,40 +1,39 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Globalization;
 using System.Linq;
+using System.Net.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 using Nop.Core;
-using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
+using Nop.Core.Domain.Payments;
 using Nop.Core.Plugins;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
-using Nop.Services.Directory;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
-using Nop.Services.Security;
 
 namespace Nixtus.Plugin.Payments.Nmi
 {
     /// <summary>
-    /// AuthorizeNet payment processor
+    /// NMI payment processor
     /// </summary>
     public class NmiPaymentProcessor : BasePlugin, IPaymentMethod
     {
+        private const string NMI_DIRECT_POST_URL = "https://msgpay.transactiongateway.com/api/transact.php";
+        private HttpClient _httpClient = new HttpClient();
+
         #region Fields
 
         private readonly ISettingService _settingService;
-        private readonly ICurrencyService _currencyService;
         private readonly ICustomerService _customerService;
         private readonly IWebHelper _webHelper;
         private readonly IOrderTotalCalculationService _orderTotalCalculationService;
-        private readonly IOrderService _orderService;
-        private readonly IOrderProcessingService _orderProcessingService;
-        private readonly IEncryptionService _encryptionService;
         private readonly ILogger _logger;
-        private readonly CurrencySettings _currencySettings;
         private readonly NmiPaymentSettings _nmiPaymentSettings;
         private readonly ILocalizationService _localizationService;
 
@@ -43,31 +42,39 @@ namespace Nixtus.Plugin.Payments.Nmi
         #region Ctor
 
         public NmiPaymentProcessor(ISettingService settingService,
-            ICurrencyService currencyService,
             ICustomerService customerService,
             IWebHelper webHelper,
             IOrderTotalCalculationService orderTotalCalculationService,
-            IOrderService orderService,
-            IOrderProcessingService orderProcessingService,
-            IEncryptionService encryptionService,
             ILogger logger,
-            CurrencySettings currencySettings,
             NmiPaymentSettings nmiPaymentSettings,
             ILocalizationService localizationService)
         {
-            this._nmiPaymentSettings = nmiPaymentSettings;
-            this._settingService = settingService;
-            this._currencyService = currencyService;
-            this._customerService = customerService;
-            this._currencySettings = currencySettings;
-            this._webHelper = webHelper;
-            this._orderTotalCalculationService = orderTotalCalculationService;
-            this._encryptionService = encryptionService;
-            this._logger = logger;
-            this._orderService = orderService;
-            this._orderProcessingService = orderProcessingService;
-            this._localizationService = localizationService;
+            _nmiPaymentSettings = nmiPaymentSettings;
+            _settingService = settingService;
+            _customerService = customerService;
+            _webHelper = webHelper;
+            _orderTotalCalculationService = orderTotalCalculationService;
+            _logger = logger;
+            _localizationService = localizationService;
         }
+
+        #endregion
+
+        #region Utilities
+        private NameValueCollection ExtractResponseValues(string response)
+        {
+            var responseValues = new NameValueCollection();
+            var split = response.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var parts in split
+                .Select(s => s.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries))
+                .Where(parts => parts.Length == 2))
+            {
+                responseValues.Add(parts[0], parts[1]);
+            }
+
+            return responseValues;
+        }
+
 
         #endregion
 
@@ -82,8 +89,55 @@ namespace Nixtus.Plugin.Payments.Nmi
         {
             var result = new ProcessPaymentResult();
             var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
+            var values = new Dictionary<string, string>
+            {
+                { "payment", "creditcard" },
+                { "type", _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture ? "sale" : "auth" },
+                { "username", _nmiPaymentSettings.Username },
+                { "password", _nmiPaymentSettings.Password },
+                { "firstname", customer.BillingAddress.FirstName },
+                { "lastname", customer.BillingAddress.LastName },
+                { "address1", customer.BillingAddress.Address1 },
+                { "city", customer.BillingAddress.City },
+                { "state", customer.BillingAddress.StateProvince.Abbreviation },
+                { "zip", customer.BillingAddress.ZipPostalCode },
+                { "payment_token", processPaymentRequest.CustomValues[Constants.CardToken].ToString() },
+                { "amount", processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) }
+            };
 
+            try
+            {
+                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
 
+                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+
+                var responseValue = responseValues["response"];
+
+                // transaction approved
+                if (responseValue == "1")
+                {
+                    result.AuthorizationTransactionCode = $"{responseValues["transactionid"]},{responseValues["authcode"]}";
+
+                    result.AuthorizationTransactionResult = $"Approved ({responseValues["responsetext"]})";
+                    result.AvsResult = responseValues["avsresponse"];
+                    result.Cvv2Result = responseValues["cvvresponse"];
+
+                    result.NewPaymentStatus = _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture
+                        ? PaymentStatus.Paid
+                        : PaymentStatus.Authorized;
+                }
+                // transaction declined or error - responseValue = 2 or 3
+                else
+                {
+                    result.AddError(responseValues["responsetext"]);
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.Error("NMI Direct Post Error", exception, customer);
+                result.AddError("Exception Occurred: " + exception.Message);
+                return result;
+            }
 
             return result;
         }
@@ -131,6 +185,44 @@ namespace Nixtus.Plugin.Payments.Nmi
         {
             var result = new CapturePaymentResult();
 
+            var values = new Dictionary<string, string>
+            {
+                { "type", "capture" },
+                { "username", _nmiPaymentSettings.Username },
+                { "password", _nmiPaymentSettings.Password },
+                { "amount", capturePaymentRequest.Order.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) }
+            };
+
+            var codes = capturePaymentRequest.Order.AuthorizationTransactionCode.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            values.Add("transactionid", codes[0]);
+
+            try
+            {
+                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
+
+                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+
+                var responseValue = responseValues["response"];
+
+                // transaction approved
+                if (responseValue == "1")
+                {
+                    result.CaptureTransactionId = $"{responseValues["transactionid"]},{responseValues["authcode"]}";
+
+                    result.NewPaymentStatus = PaymentStatus.Paid;
+                }
+                // transaction declined or error - responseValue = 2 or 3
+                else
+                {
+                    result.AddError(responseValues["responsetext"]);
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.Error("NMI Direct Post Error", exception);
+                result.AddError("Exception Occurred: " + exception.Message);
+                return result;
+            }
 
             return result;
         }
@@ -144,7 +236,49 @@ namespace Nixtus.Plugin.Payments.Nmi
         {
             var result = new RefundPaymentResult();
 
+            var values = new Dictionary<string, string>
+            {
+                { "type", "capture" },
+                { "username", _nmiPaymentSettings.Username },
+                { "password", _nmiPaymentSettings.Password },
+                { "amount", refundPaymentRequest.AmountToRefund.ToString("0.00", CultureInfo.InvariantCulture) }
+            };
 
+            var codes = refundPaymentRequest.Order.CaptureTransactionId == null
+                ? refundPaymentRequest.Order.AuthorizationTransactionCode.Split(',')
+                : refundPaymentRequest.Order.CaptureTransactionId.Split(',');
+
+            values.Add("transactionid", codes[0]);
+
+            try
+            {
+                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
+
+                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+
+                var responseValue = responseValues["response"];
+
+                // transaction approved
+                if (responseValue == "1")
+                {
+                    var refundedTotalAmount = refundPaymentRequest.AmountToRefund + refundPaymentRequest.Order.RefundedAmount;
+
+                    var isOrderFullyRefunded = refundedTotalAmount == refundPaymentRequest.Order.OrderTotal;
+
+                    result.NewPaymentStatus = isOrderFullyRefunded ? PaymentStatus.Refunded : PaymentStatus.PartiallyRefunded;
+                }
+                // transaction declined or error - responseValue = 2 or 3
+                else
+                {
+                    result.AddError(responseValues["responsetext"]);
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.Error("NMI Direct Post Error", exception);
+                result.AddError("Exception Occurred: " + exception.Message);
+                return result;
+            }
 
             return result;
         }
@@ -158,7 +292,44 @@ namespace Nixtus.Plugin.Payments.Nmi
         {
             var result = new VoidPaymentResult();
 
+            var values = new Dictionary<string, string>
+            {
+                { "type", "void" },
+                { "username", _nmiPaymentSettings.Username },
+                { "password", _nmiPaymentSettings.Password },
+            };
 
+            var codes = voidPaymentRequest.Order.CaptureTransactionId == null
+                ? voidPaymentRequest.Order.AuthorizationTransactionCode.Split(',')
+                : voidPaymentRequest.Order.CaptureTransactionId.Split(',');
+
+            values.Add("transactionid", codes[0]);
+
+            try
+            {
+                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
+
+                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+
+                var responseValue = responseValues["response"];
+
+                // transaction approved
+                if (responseValue == "1")
+                {
+                    result.NewPaymentStatus = PaymentStatus.Voided;
+                }
+                // transaction declined or error - responseValue = 2 or 3
+                else
+                {
+                    result.AddError(responseValues["responsetext"]);
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.Error("NMI Direct Post Error", exception);
+                result.AddError("Exception Occurred: " + exception.Message);
+                return result;
+            }
 
             return result;
         }
@@ -235,7 +406,7 @@ namespace Nixtus.Plugin.Payments.Nmi
 
             //pass custom values to payment method
             if (form.TryGetValue("Token", out StringValues token) && !StringValues.IsNullOrEmpty(token))
-                paymentRequest.CustomValues.Add("Nmi.Card.Token", token.ToString());
+                paymentRequest.CustomValues.Add(Constants.CardToken, token.ToString());
 
             return paymentRequest;
         }
@@ -263,7 +434,8 @@ namespace Nixtus.Plugin.Payments.Nmi
             var settings = new NmiPaymentSettings
             {
                 Password = "123",
-                Username = "456"
+                Username = "456",
+                TransactMode = TransactMode.AuthorizeAndCapture
             };
             _settingService.SaveSetting(settings);
 
@@ -274,6 +446,10 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password.Hint", "Password assigned to the merchant account");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey", "Security Key");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey.Hint", "API security key assigned to the merchant account, using this combined with username/password will result in an error");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey", "Collect JS Tokenization Key");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey.Hint", "Tokenization key used for Collect.js library");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues", "Transaction mode");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues.Hint", "Choose transaction mode.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee", "Additional fee");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
@@ -298,6 +474,10 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage");
