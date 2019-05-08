@@ -64,7 +64,7 @@ namespace Nixtus.Plugin.Payments.Nmi
         private NameValueCollection ExtractResponseValues(string response)
         {
             var responseValues = new NameValueCollection();
-            var split = response.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var split = response.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var parts in split
                 .Select(s => s.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries))
                 .Where(parts => parts.Length == 2))
@@ -102,7 +102,8 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "state", customer.BillingAddress.StateProvince.Abbreviation },
                 { "zip", customer.BillingAddress.ZipPostalCode },
                 { "payment_token", processPaymentRequest.CustomValues[Constants.CardToken].ToString() },
-                { "amount", processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) }
+                { "amount", processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) },
+                { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
 
             try
