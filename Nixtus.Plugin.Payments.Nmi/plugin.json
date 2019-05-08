@@ -1,0 +1,11 @@
+﻿{
+  "Group": "Payment methods",
+  "FriendlyName": "Credit Card",
+  "SystemName": "Payments.Nmi",
+  "Version": "1.00",
+  "SupportedVersions": [ "4.00" ],
+  "Author": "Nixtus, LLC",
+  "DisplayOrder": 1,
+  "FileName": "Nixtus.Plugin.Payments.Nmi.dll",
+  "Description": "This plugin allows paying with NMI"
+}
