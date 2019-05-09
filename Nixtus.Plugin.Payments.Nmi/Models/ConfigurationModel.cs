@@ -17,7 +17,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Models
         public bool Password_OverrideForStore { get; set; }
 
         [NopResourceDisplayName("Plugins.Payments.Nmi.Fields.UseUsernamePassword")]
-        public string UseUsernamePassword { get; set; }
+        public bool UseUsernamePassword { get; set; }
         public bool UseUsernamePassword_OverrideForStore { get; set; }
 
         [NopResourceDisplayName("Plugins.Payments.Nmi.Fields.SecurityKey")]
