@@ -17,7 +17,6 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
                 return View("~/Plugins/Payments.Nmi/Views/PaymentInfo.cshtml", model);
 
             var form = Request.Form;
-            model.CardholderName = form["CardholderName"];
             model.CardNumber = form["CardNumber"];
             model.CardCode = form["CardCode"];
 

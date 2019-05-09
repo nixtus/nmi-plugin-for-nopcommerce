@@ -15,6 +15,11 @@ namespace Nixtus.Plugin.Payments.Nmi
         public string Password { get; set; }
 
         /// <summary>
+        /// If true use username/password otherwise security key
+        /// </summary>
+        public bool UseUsernamePassword { get; set; }
+
+        /// <summary>
         /// API Security key assigned to the merchant account
         /// </summary>
         public string SecurityKey { get; set; }

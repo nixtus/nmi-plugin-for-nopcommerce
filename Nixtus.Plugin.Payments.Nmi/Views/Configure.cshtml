@@ -10,28 +10,7 @@
     <div class="panel-group">
         <div class="panel panel-default">
             <div class="panel-body">
-                <div class="form-group">
-                    <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="Username_OverrideForStore" asp-input="Username" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
-                        <nop-label asp-for="Username" />
-                    </div>
-                    <div class="col-md-9">
-                        <nop-editor asp-for="Username" />
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="Password_OverrideForStore" asp-input="Password" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
-                        <nop-label asp-for="Password" />
-                    </div>
-                    <div class="col-md-9">
-                        <nop-editor asp-for="Password" />
-                        <span asp-validation-for="Password"></span>
-                    </div>
-                </div>
-
-                <div class="form-group">
+                <div class="form-group" id="security-key">
                     <div class="col-md-3">
                         <nop-override-store-checkbox asp-for="SecurityKey_OverrideForStore" asp-input="SecurityKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="SecurityKey" />
@@ -62,7 +41,39 @@
                         <nop-select asp-for="TransactModeId" asp-items="Model.TransactModeValues" />
                     </div>
                 </div>
+                
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="UseUsernamePassword_OverrideForStore" asp-input="UseUsernamePassword" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="UseUsernamePassword" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="UseUsernamePassword" />
+                        <span asp-validation-for="UseUsernamePassword"></span>
+                    </div>
+                </div>
 
+                <div class="form-group" id="username">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="Username_OverrideForStore" asp-input="Username" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="Username" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="Username" />
+                    </div>
+                </div>
+
+                <div class="form-group" id="password">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="Password_OverrideForStore" asp-input="Password" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="Password" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="Password" />
+                        <span asp-validation-for="Password"></span>
+                    </div>
+                </div>
+                
                 <div class="form-group">
                     <div class="col-md-3">
                         <nop-override-store-checkbox asp-for="AdditionalFee_OverrideForStore" asp-input="AdditionalFee" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
@@ -97,3 +108,22 @@
         </div>
     </div>
 </form>
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        $('#@Html.IdFor(model => model.UseUsernamePassword)').click(toggleUseSecurityKey);
+        toggleUseSecurityKey();
+    });
+
+    function toggleUseSecurityKey() {
+        if ($('#@Html.IdFor(model => model.UseUsernamePassword)').is(':checked')) {
+            $('#security-key').hide();
+            $('#username').show();
+            $('#password').show();
+        } else {
+            $('#security-key').show();
+            $('#username').hide();
+            $('#password').hide();
+        }
+    }
+</script>

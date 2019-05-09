@@ -75,6 +75,23 @@ namespace Nixtus.Plugin.Payments.Nmi
             return responseValues;
         }
 
+        /// <summary>
+        /// Adds either security key or username/password
+        /// </summary>
+        /// <param name="values"></param>
+        private void AddSecurityValues(IDictionary<string, string> values)
+        {
+            if (_nmiPaymentSettings.UseUsernamePassword)
+            {
+                values.Add("username", _nmiPaymentSettings.Username);
+                values.Add("password", _nmiPaymentSettings.Password);
+            }
+            else
+            {
+                values.Add("security_key", _nmiPaymentSettings.SecurityKey);
+            }
+        }
+
 
         #endregion
 
@@ -93,8 +110,6 @@ namespace Nixtus.Plugin.Payments.Nmi
             {
                 { "payment", "creditcard" },
                 { "type", _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture ? "sale" : "auth" },
-                { "username", _nmiPaymentSettings.Username },
-                { "password", _nmiPaymentSettings.Password },
                 { "firstname", customer.BillingAddress.FirstName },
                 { "lastname", customer.BillingAddress.LastName },
                 { "address1", customer.BillingAddress.Address1 },
@@ -105,6 +120,9 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "amount", processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) },
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
+
+            // add security key or username/password
+            AddSecurityValues(values);
 
             try
             {
@@ -189,10 +207,11 @@ namespace Nixtus.Plugin.Payments.Nmi
             var values = new Dictionary<string, string>
             {
                 { "type", "capture" },
-                { "username", _nmiPaymentSettings.Username },
-                { "password", _nmiPaymentSettings.Password },
                 { "amount", capturePaymentRequest.Order.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) }
             };
+
+            // add security key or username/password
+            AddSecurityValues(values);
 
             var codes = capturePaymentRequest.Order.AuthorizationTransactionCode.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             values.Add("transactionid", codes[0]);
@@ -240,10 +259,11 @@ namespace Nixtus.Plugin.Payments.Nmi
             var values = new Dictionary<string, string>
             {
                 { "type", "capture" },
-                { "username", _nmiPaymentSettings.Username },
-                { "password", _nmiPaymentSettings.Password },
                 { "amount", refundPaymentRequest.AmountToRefund.ToString("0.00", CultureInfo.InvariantCulture) }
             };
+
+            // add security key or username/password
+            AddSecurityValues(values);
 
             var codes = refundPaymentRequest.Order.CaptureTransactionId == null
                 ? refundPaymentRequest.Order.AuthorizationTransactionCode.Split(',')
@@ -295,10 +315,11 @@ namespace Nixtus.Plugin.Payments.Nmi
 
             var values = new Dictionary<string, string>
             {
-                { "type", "void" },
-                { "username", _nmiPaymentSettings.Username },
-                { "password", _nmiPaymentSettings.Password },
+                { "type", "void" }
             };
+
+            // add security key or username/password
+            AddSecurityValues(values);
 
             var codes = voidPaymentRequest.Order.CaptureTransactionId == null
                 ? voidPaymentRequest.Order.AuthorizationTransactionCode.Split(',')
@@ -436,6 +457,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             {
                 Password = "123",
                 Username = "456",
+                UseUsernamePassword = false,
                 TransactMode = TransactMode.AuthorizeAndCapture
             };
             _settingService.SaveSetting(settings);
@@ -455,6 +477,8 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword", "Use username/password");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint", "If enabled username/password will be used for authentication instead of the security key");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription", "Pay by credit / debit card");
 
             base.Install();
@@ -483,6 +507,8 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription");
 
             base.Uninstall();

@@ -5,9 +5,6 @@ namespace Nixtus.Plugin.Payments.Nmi.Models
 {
     public class PaymentInfoModel : BaseNopModel
     {
-        [NopResourceDisplayName("Payment.CardholderName")]
-        public string CardholderName { get; set; }
-
         [NopResourceDisplayName("Payment.CardNumber")]
         public string CardNumber { get; set; }
 

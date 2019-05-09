@@ -10,15 +10,6 @@
 <table width="100%" cellspacing="2" cellpadding="1" border="0">
     <tr>
         <td>
-            @Html.LabelFor(model => model.CardholderName, false):
-        </td>
-        <td>
-            @Html.TextBoxFor(model => model.CardholderName, new { style = "Width: 165px;", autocomplete = "off" })
-            @Html.ValidationMessageFor(model => model.CardholderName)
-        </td>
-    </tr>
-    <tr>
-        <td>
             @Html.LabelFor(model => model.CardNumber, false):
         </td>
         <td id="ccnumber"></td>
