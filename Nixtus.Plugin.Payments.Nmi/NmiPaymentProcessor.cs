@@ -7,6 +7,7 @@ using System.Net.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 using Nop.Core;
+using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
 using Nop.Core.Plugins;
@@ -91,8 +92,6 @@ namespace Nixtus.Plugin.Payments.Nmi
                 values.Add("security_key", _nmiPaymentSettings.SecurityKey);
             }
         }
-
-
         #endregion
 
         #region Methods
@@ -367,6 +366,92 @@ namespace Nixtus.Plugin.Payments.Nmi
 
             var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
 
+            var orderTotal = processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture);
+
+            var values = new Dictionary<string, string>
+            {
+                { "payment", "creditcard" },
+                { "type", _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture ? "sale" : "auth" },
+                { "firstname", customer.BillingAddress.FirstName },
+                { "lastname", customer.BillingAddress.LastName },
+                { "address1", customer.BillingAddress.Address1 },
+                { "city", customer.BillingAddress.City },
+                { "state", customer.BillingAddress.StateProvince.Abbreviation },
+                { "zip", customer.BillingAddress.ZipPostalCode },
+                { "payment_token", processPaymentRequest.CustomValues[Constants.CardToken].ToString() },
+                { "amount",  orderTotal },
+                { "orderid", processPaymentRequest.OrderGuid.ToString() }
+            };
+
+            // add security key or username/password
+            AddSecurityValues(values);
+
+            // recurring payment information
+            values.Add("recurring", "add_subscription");
+            values.Add("plan_amount", orderTotal);
+
+            // continue until canceled
+            values.Add("plan_payments", "0");
+
+            switch (processPaymentRequest.RecurringCyclePeriod)
+            {
+                case RecurringProductCyclePeriod.Days:
+                    values.Add("day_frequency", processPaymentRequest.RecurringCycleLength.ToString());
+                    break;
+                case RecurringProductCyclePeriod.Weeks:
+                    var days = processPaymentRequest.RecurringCycleLength * 7;
+
+                    values.Add("day_frequency", days.ToString());
+                    break;
+                case RecurringProductCyclePeriod.Months:
+                    values.Add("month_frequency", processPaymentRequest.RecurringCycleLength.ToString());
+                    values.Add("day_of_month", DateTime.UtcNow.Day.ToString());
+                    break;
+                case RecurringProductCyclePeriod.Years:
+                    // NMI gateway doesn't support recurring greater than 24 months
+                    // but just let the gateway return the error and we will handle like all 
+                    // other errors
+                    var months = processPaymentRequest.RecurringCycleLength * 12;
+                    values.Add("month_frequency", months.ToString());
+                    values.Add("day_of_month", DateTime.UtcNow.Day.ToString());
+                    break;
+                default:
+                    throw new NopException("NMI: Reoccurring Product Cycle not supported");
+            }
+
+            try
+            {
+                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
+
+                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+
+                var responseValue = responseValues["response"];
+
+                // transaction approved
+                if (responseValue == "1")
+                {
+                    result.SubscriptionTransactionId = $"{responseValues["transactionid"]},{responseValues["authcode"]}";
+
+                    result.AvsResult = responseValues["avsresponse"];
+                    result.Cvv2Result = responseValues["cvvresponse"];
+
+                    result.NewPaymentStatus = _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture
+                        ? PaymentStatus.Paid
+                        : PaymentStatus.Authorized;
+                }
+                // transaction declined or error - responseValue = 2 or 3
+                else
+                {
+                    result.AddError(responseValues["responsetext"]);
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.Error("NMI Direct Post Error", exception, customer);
+                result.AddError("Exception Occurred: " + exception.Message);
+                return result;
+            }
+
 
             return result;
         }
@@ -381,7 +466,41 @@ namespace Nixtus.Plugin.Payments.Nmi
         public CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
             var result = new CancelRecurringPaymentResult();
+            var values = new Dictionary<string, string>
+            {
+                { "recurring", "delete_subscription" }
+            };
 
+            // add security key or username/password
+            AddSecurityValues(values);
+
+            values.Add("subscription_id", cancelPaymentRequest.Order.SubscriptionTransactionId);
+
+            try
+            {
+                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
+
+                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+
+                var responseValue = responseValues["response"];
+
+                // transaction approved
+                if (responseValue == "1")
+                {
+                    // nothing to do
+                }
+                // transaction declined or error - responseValue = 2 or 3
+                else
+                {
+                    result.AddError(responseValues["responsetext"]);
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.Error("NMI Direct Post Error", exception);
+                result.AddError("Exception Occurred: " + exception.Message);
+                return result;
+            }
 
             return result;
         }

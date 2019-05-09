@@ -2,11 +2,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Nixtus.Plugin.Payments.Nmi.Models;
 using Nop.Core;
-using Nop.Core.Domain.Payments;
 using Nop.Services;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
-using Nop.Services.Payments;
 using Nop.Services.Security;
 using Nop.Services.Stores;
 using Nop.Web.Framework;
@@ -21,24 +19,18 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
         private readonly ISettingService _settingService;
         private readonly IStoreService _storeService;
         private readonly IWorkContext _workContext;
-        private readonly IPaymentService _paymentService;
-        private readonly PaymentSettings _paymentSettings;
         private readonly IPermissionService _permissionService;
         
         public PaymentNmiController(ILocalizationService localizationService,
             ISettingService settingService,
             IStoreService storeService,
             IWorkContext workContext,
-            IPaymentService paymentService,
-            PaymentSettings paymentSettings,
             IPermissionService permissionService)
         {
             _localizationService = localizationService;
             _settingService = settingService;
             _storeService = storeService;
             _workContext = workContext;
-            _paymentService = paymentService;
-            _paymentSettings = paymentSettings;
             _permissionService = permissionService;
         }
 
