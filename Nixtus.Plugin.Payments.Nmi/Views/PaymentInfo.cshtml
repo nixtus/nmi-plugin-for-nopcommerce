@@ -3,9 +3,11 @@
 }
 
 @inject NmiPaymentSettings nmiPaymentSettings
+@inject Nop.Core.Domain.Orders.OrderSettings orderSettings
 
 @using Nixtus.Plugin.Payments.Nmi
 @model Nixtus.Plugin.Payments.Nmi.Models.PaymentInfoModel
+
 
 <table width="100%" cellspacing="2" cellpadding="1" border="0">
     <tr>
@@ -30,6 +32,9 @@
 <input type="hidden" name="Token" id="Token" asp-for="Token">
 
 <script>
+    var onePageCheckout = @orderSettings.OnePageCheckoutEnabled.ToString().ToLower();
+	var formSubmitted = false;
+
     function addScript() {
         var s = document.createElement('script');
         s.setAttribute('src', 'https://secure.networkmerchants.com/token/Collect.js');
@@ -39,7 +44,13 @@
                 variant: 'inline',
                 callback: (response) => {
                     $('#@Html.IdFor(model => model.Token)').val(response.token);
-                    PaymentInfo.save();
+
+                    if (onePageCheckout) {
+                        PaymentInfo.save();
+                    } else {
+                        formSubmitted = true;
+						$("input.payment-info-next-step-button").click();
+                    }
                 }
             });
         };
@@ -54,7 +65,15 @@
 
         addScript();
 
-        $(".payment-info-next-step-button").click((event) => {
+        $(".payment-info-next-step-button").on('click', (event) => {
+			if (formSubmitted) {
+				// add form parameter so that the right action is hit
+				var input = $("<input>").attr("type", "hidden").attr("name", "nextstep").val("Next");
+				$("form[action='/checkout/paymentinfo']").append(input);
+				$("form[action='/checkout/paymentinfo']").submit();
+				return false;
+			}
+
             CollectJS.startPaymentRequest(event);
 
             return false;

@@ -452,11 +452,8 @@ namespace Nixtus.Plugin.Payments.Nmi
                 return result;
             }
 
-
             return result;
         }
-
-
 
         /// <summary>
         /// Cancels a recurring payment
