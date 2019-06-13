@@ -8,6 +8,11 @@
 @using Nixtus.Plugin.Payments.Nmi
 @model Nixtus.Plugin.Payments.Nmi.Models.PaymentInfoModel
 
+<style scoped>
+    td.error {
+        color: red;
+    }
+</style>
 
 <table width="100%" cellspacing="2" cellpadding="1" border="0">
     <tr>
@@ -17,16 +22,28 @@
         <td id="ccnumber"></td>
     </tr>
     <tr>
+        <td></td>
+        <td class="error" id="ccnumber-error"></td>
+    </tr>
+    <tr>
         <td>
             @Html.LabelFor(model => model.ExpireMonth, false):
         </td>
         <td id="ccexp"></td>
     </tr>
     <tr>
+        <td></td>
+        <td class="error" id="ccexp-error"></td>
+    </tr>
+    <tr>
         <td>
             @Html.LabelFor(model => model.CardCode, false):
         </td>
         <td id="cvv"></td>
+    </tr>
+    <tr>
+        <td></td>
+        <td class="error" id="cvv-error"></td>
     </tr>
 </table>
 <input type="hidden" name="Token" id="Token" asp-for="Token">
@@ -51,6 +68,13 @@
                         formSubmitted = true;
 						$("input.payment-info-next-step-button").click();
                     }
+                },
+                validationCallback: (field, status, message) => {
+                    if (!status) {
+                        $("#" + field + "-error").html(message);
+                    } else {
+                        $("#" + field + "-error").html("");
+                    }
                 }
             });
         };
@@ -60,8 +84,6 @@
     $(document).ready(() => {
         //remove handler so we dont validate the form
         $('.payment-info-next-step-button').attr('onclick', null);
-
-        console.log('start');
 
         addScript();
 
