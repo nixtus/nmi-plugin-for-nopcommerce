@@ -114,7 +114,7 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "address1", customer.BillingAddress.Address1 },
                 { "city", customer.BillingAddress.City },
                 { "state", customer.BillingAddress.StateProvince.Abbreviation },
-                { "zip", customer.BillingAddress.ZipPostalCode },
+                { "zip", customer.BillingAddress.ZipPostalCode.Substring(0, 5) },
                 { "payment_token", processPaymentRequest.CustomValues[Constants.CardToken].ToString() },
                 { "amount", processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) },
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
@@ -377,7 +377,7 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "address1", customer.BillingAddress.Address1 },
                 { "city", customer.BillingAddress.City },
                 { "state", customer.BillingAddress.StateProvince.Abbreviation },
-                { "zip", customer.BillingAddress.ZipPostalCode },
+                { "zip", customer.BillingAddress.ZipPostalCode.Substring(0, 5) },
                 { "payment_token", processPaymentRequest.CustomValues[Constants.CardToken].ToString() },
                 { "amount",  orderTotal },
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
