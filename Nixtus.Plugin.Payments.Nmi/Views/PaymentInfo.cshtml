@@ -14,6 +14,20 @@
     }
 </style>
 
+@if (!Model.IsGuest && Model.StoredCards.Any())
+{
+    <table width="100%" cellspacing="2" cellpadding="1" border="0">
+        <tr>
+            <td>
+                <label asp-for="StoredCardId">@T("Plugins.Payments.Nmi.Fields.StoredCard"):</label>
+            </td>
+            <td>
+                <select asp-for="StoredCardId" asp-items="Model.StoredCards" class="nmi-input"></select>
+            </td>
+        </tr>
+    </table>
+}
+
 <table width="100%" cellspacing="2" cellpadding="1" border="0">
     <tr>
         <td>
@@ -45,6 +59,18 @@
         <td></td>
         <td class="error" id="cvv-error"></td>
     </tr>
+    @if (!Model.IsGuest)
+    {
+        <tr>
+            <td>
+                @Html.LabelFor(model => model.SaveCustomer, false):
+            </td>
+            <td>
+                <input type="checkbox" asp-for="SaveCustomer" />
+                <span asp-validation-for="SaveCustomer"></span>
+            </td>
+        </tr>
+    }
 </table>
 <input type="hidden" name="Token" id="Token" asp-for="Token">
 

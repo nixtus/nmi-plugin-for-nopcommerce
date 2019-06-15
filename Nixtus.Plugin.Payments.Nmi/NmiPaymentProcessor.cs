@@ -11,6 +11,7 @@ using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
 using Nop.Core.Plugins;
+using Nop.Services.Common;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
 using Nop.Services.Localization;
@@ -37,6 +38,7 @@ namespace Nixtus.Plugin.Payments.Nmi
         private readonly ILogger _logger;
         private readonly NmiPaymentSettings _nmiPaymentSettings;
         private readonly ILocalizationService _localizationService;
+        private readonly IGenericAttributeService _genericAttributeService;
 
         #endregion
 
@@ -48,7 +50,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             IOrderTotalCalculationService orderTotalCalculationService,
             ILogger logger,
             NmiPaymentSettings nmiPaymentSettings,
-            ILocalizationService localizationService)
+            ILocalizationService localizationService, IGenericAttributeService genericAttributeService)
         {
             _nmiPaymentSettings = nmiPaymentSettings;
             _settingService = settingService;
@@ -57,6 +59,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             _orderTotalCalculationService = orderTotalCalculationService;
             _logger = logger;
             _localizationService = localizationService;
+            _genericAttributeService = genericAttributeService;
         }
 
         #endregion
@@ -105,6 +108,8 @@ namespace Nixtus.Plugin.Payments.Nmi
         {
             var result = new ProcessPaymentResult();
             var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
+            var saveCustomer = Convert.ToBoolean(processPaymentRequest.CustomValues[Constants.SaveCustomerKey].ToString());
+
             var values = new Dictionary<string, string>
             {
                 { "payment", "creditcard" },
@@ -119,6 +124,20 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "amount", processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) },
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
+
+            if (saveCustomer)
+            {
+                var existingCustomerVaultId = customer.GetAttribute<string>(Constants.CustomerVaultIdKey);
+                if (string.IsNullOrEmpty(existingCustomerVaultId))
+                {
+                    values.Add("customer_vault", "add_customer");
+                    values.Add("customer_vault_id", customer.CustomerGuid.ToString());
+                }
+                else
+                {
+                    values.Add("customer_vault", "update_customer");
+                }
+            }
 
             // add security key or username/password
             AddSecurityValues(values);
@@ -143,6 +162,12 @@ namespace Nixtus.Plugin.Payments.Nmi
                     result.NewPaymentStatus = _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture
                         ? PaymentStatus.Paid
                         : PaymentStatus.Authorized;
+
+                    // save customer vault id, if needed
+                    if (saveCustomer)
+                    {
+                        _genericAttributeService.SaveAttribute(customer, Constants.CustomerVaultIdKey, customer.CustomerGuid.ToString());
+                    }
                 }
                 // transaction declined or error - responseValue = 2 or 3
                 else
@@ -546,6 +571,9 @@ namespace Nixtus.Plugin.Payments.Nmi
             if (form.TryGetValue("Token", out StringValues token) && !StringValues.IsNullOrEmpty(token))
                 paymentRequest.CustomValues.Add(Constants.CardToken, token.ToString());
 
+            if (form.TryGetValue("SaveCustomer", out StringValues saveCustomer) && !StringValues.IsNullOrEmpty(saveCustomer))
+                paymentRequest.CustomValues.Add(Constants.SaveCustomerKey, saveCustomer.ToString());
+
             return paymentRequest;
         }
 
@@ -596,6 +624,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword", "Use username/password");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint", "If enabled username/password will be used for authentication instead of the security key");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription", "Pay by credit / debit card");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer", "Save card information");
 
             base.Install();
         }
@@ -626,6 +655,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer");
 
             base.Uninstall();
         }
