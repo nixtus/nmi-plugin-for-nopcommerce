@@ -7,6 +7,11 @@ namespace Nixtus.Plugin.Payments.Nmi.Models
 {
     public class PaymentInfoModel : BaseNopModel
     {
+        public PaymentInfoModel()
+        {
+            StoredCards = new List<SelectListItem>();
+        }
+        
         // These properties are only used to display label on the payment info screen
         [NopResourceDisplayName("Payment.CardNumber")]
         public string CardNumber { get; set; }
@@ -28,5 +33,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Models
         public string Token { get; set; }
 
         public bool IsGuest { get; set; }
+
+        public bool AllowCustomerToSaveCards { get; set; }
     }
 }

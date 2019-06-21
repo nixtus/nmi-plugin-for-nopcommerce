@@ -14,7 +14,7 @@
     }
 </style>
 
-@if (!Model.IsGuest && Model.StoredCards.Any())
+@if (!Model.IsGuest && Model.AllowCustomerToSaveCards && Model.StoredCards.Any())
 {
     <table width="100%" cellspacing="2" cellpadding="1" border="0">
         <tr>
@@ -59,7 +59,7 @@
         <td></td>
         <td class="error" id="cvv-error"></td>
     </tr>
-    @if (!Model.IsGuest)
+    @if (!Model.IsGuest && Model.AllowCustomerToSaveCards)
     {
         <tr>
             <td>

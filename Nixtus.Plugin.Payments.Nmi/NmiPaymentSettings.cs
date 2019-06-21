@@ -20,6 +20,12 @@ namespace Nixtus.Plugin.Payments.Nmi
         public bool UseUsernamePassword { get; set; }
 
         /// <summary>
+        /// If true then customer will be allowed to save their cards for future use
+        /// if they are registered 
+        /// </summary>
+        public bool AllowCustomerToSaveCards { get; set; }
+
+        /// <summary>
         /// API Security key assigned to the merchant account
         /// </summary>
         public string SecurityKey { get; set; }

@@ -12,7 +12,6 @@ using Nop.Core.Domain.Customers;
 using Nop.Services.Common;
 using Nop.Services.Logging;
 using Nop.Web.Framework.Components;
-using OfficeOpenXml.FormulaParsing.Excel.Functions.Text;
 
 namespace Nixtus.Plugin.Payments.Nmi.Components
 {
@@ -22,7 +21,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
         private readonly IWorkContext _workContext;
         private readonly ILogger _logger;
         private readonly NmiPaymentSettings _nmiPaymentSettings;
-        private HttpClient _httpClient = new HttpClient();
+        private readonly HttpClient _httpClient = new HttpClient();
         private const string NMI_QUERY_URL = "https://msgpay.transactiongateway.com/api/query.php";
 
         public NmiViewComponent(IWorkContext workContext, ILogger logger, NmiPaymentSettings nmiPaymentSettings)
@@ -36,9 +35,22 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
         {
             var model = new PaymentInfoModel
             {
-                IsGuest = _workContext.CurrentCustomer.IsGuest()
+                IsGuest = _workContext.CurrentCustomer.IsGuest(),
+                AllowCustomerToSaveCards = _nmiPaymentSettings.AllowCustomerToSaveCards
             };
 
+            if (_nmiPaymentSettings.AllowCustomerToSaveCards)
+            {
+                PopulateStoredCards(model);
+
+                model.StoredCards.Insert(0, new SelectListItem { Text = "Select a card...", Value = "0" });
+            }
+
+            return View("~/Plugins/Payments.Nmi/Views/PaymentInfo.cshtml", model);
+        }
+
+        private void PopulateStoredCards(PaymentInfoModel model)
+        {
             try
             {
                 var values = new Dictionary<string, string>
@@ -46,7 +58,9 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
                     { "username", _nmiPaymentSettings.Username },
                     { "password", _nmiPaymentSettings.Password },
                     { "report_type", "customer_vault" },
-                    { "customer_vault_id", _workContext.CurrentCustomer.GetAttribute<string>(Constants.CustomerVaultIdKey) }
+                    { "customer_vault_id", _workContext.CurrentCustomer.GetAttribute<string>(Constants.CustomerVaultIdKey) },
+                    // this is an undocumented variable which will make the API return multiple billings (aka credit cards)
+                    { "ver", "2" }
                 };
 
                 var response = _httpClient.PostAsync(NMI_QUERY_URL, new FormUrlEncodedContent(values)).Result;
@@ -55,25 +69,24 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
                     var nmiQueryResponse = DeserializeXml(response.Content.ReadAsStringAsync().Result);
                     if (nmiQueryResponse != null)
                     {
-                        model.StoredCards.Add(new SelectListItem
+                        foreach (var billing in nmiQueryResponse.CustomerVault.Customer.Billing ?? new List<Billing>())
                         {
-                            Value = nmiQueryResponse.CustomerVault.Customer.CcHash,
-                            Text = $"{nmiQueryResponse.CustomerVault.Customer.CcNumber} " +
-                                   $"(Exp. ${nmiQueryResponse.CustomerVault.Customer.CcExp.Substring(0, 2)}/" +
-                                   $"${nmiQueryResponse.CustomerVault.Customer.CcExp.Substring(2, 2)}"
-                        });
+                            model.StoredCards.Add(new SelectListItem
+                            {
+                                Value = billing.Id,
+                                Text = $"{billing.CcNumber} " +
+                                       $"(Exp. ${billing.CcExp.Substring(0, 2)}/" +
+                                       $"{billing.CcExp.Substring(2, 2)}"
+                            });
+                        }
                     }
                 }
 
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                _logger.Error("NMI Error querying customer vault records");
+                _logger.Error("NMI Error querying customer vault records", exception);
             }
-
-            model.StoredCards.Insert(0, new SelectListItem { Text = "Select a card...", Value = "0" });
-
-            return View("~/Plugins/Payments.Nmi/Views/PaymentInfo.cshtml", model);
         }
 
         private NmiQueryResponse DeserializeXml(string xml)

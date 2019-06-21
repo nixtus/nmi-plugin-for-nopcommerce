@@ -125,7 +125,7 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
 
-            if (saveCustomer)
+            if (_nmiPaymentSettings.AllowCustomerToSaveCards && saveCustomer)
             {
                 var existingCustomerVaultId = customer.GetAttribute<string>(Constants.CustomerVaultIdKey);
                 if (string.IsNullOrEmpty(existingCustomerVaultId))
@@ -622,7 +622,11 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword", "Use username/password");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint", "If enabled username/password will be used for authentication instead of the security key");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint", "If enabled username/password will be used for authentication to the payment API instead of the security key");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards", "Allow Customers To Store Cards");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint", "If enabled registered customers will be able to save cards for future use.  Also, you must enter the username/password for this functionality to be available.");
+
+            //Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription", "Pay by credit / debit card");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer", "Save card information");
 
