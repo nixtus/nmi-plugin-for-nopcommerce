@@ -21,14 +21,14 @@
                     </div>
                 </div>
 
-                <div class="form-group" id="security-key">
+                <div class="form-group">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="SecurityKey_OverrideForStore" asp-input="SecurityKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
-                        <nop-label asp-for="SecurityKey" />
+                        <nop-override-store-checkbox asp-for="AllowCustomerToSaveCards_OverrideForStore" asp-input="AllowCustomerToSaveCards" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="AllowCustomerToSaveCards" />
                     </div>
                     <div class="col-md-9">
-                        <nop-editor asp-for="SecurityKey" />
-                        <span asp-validation-for="SecurityKey"></span>
+                        <nop-editor asp-for="AllowCustomerToSaveCards" />
+                        <span asp-validation-for="AllowCustomerToSaveCards"></span>
                     </div>
                 </div>
 
@@ -50,6 +50,17 @@
                     <div class="col-md-9">
                         <nop-editor asp-for="Password" />
                         <span asp-validation-for="Password"></span>
+                    </div>
+                </div>
+                
+                <div class="form-group" id="security-key">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="SecurityKey_OverrideForStore" asp-input="SecurityKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="SecurityKey" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="SecurityKey" />
+                        <span asp-validation-for="SecurityKey"></span>
                     </div>
                 </div>
 
@@ -111,17 +122,17 @@
 
 <script type="text/javascript">
     $(document).ready(function () {
-        $('#@Html.IdFor(model => model.UseUsernamePassword)').click(toggleUseSecurityKey);
-        toggleUseSecurityKey();
+        $('#@Html.IdFor(model => model.UseUsernamePassword)').click(toggleUsernamePassword);
+        $('#@Html.IdFor(model => model.AllowCustomerToSaveCards)').click(toggleUsernamePassword);
+        toggleUsernamePassword();
     });
 
-    function toggleUseSecurityKey() {
-        if ($('#@Html.IdFor(model => model.UseUsernamePassword)').is(':checked')) {
-            $('#security-key').hide();
+    function toggleUsernamePassword() {
+        if ($('#@Html.IdFor(model => model.UseUsernamePassword)').is(':checked')
+            || $('#@Html.IdFor(model => model.AllowCustomerToSaveCards)').is(':checked')) {
             $('#username').show();
             $('#password').show();
         } else {
-            $('#security-key').show();
             $('#username').hide();
             $('#password').hide();
         }

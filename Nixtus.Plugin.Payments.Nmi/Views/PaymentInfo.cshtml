@@ -28,7 +28,7 @@
     </table>
 }
 
-<table width="100%" cellspacing="2" cellpadding="1" border="0">
+<table width="100%" cellspacing="2" cellpadding="1" border="0" id="nmi-card-details">
     <tr>
         <td>
             @Html.LabelFor(model => model.CardNumber, false):
@@ -108,6 +108,9 @@
     }
 
     $(document).ready(() => {
+        $('#@Html.IdFor(model => model.StoredCardId)').change(toggleStoredCard);
+        toggleStoredCard();
+
         //remove handler so we dont validate the form
         $('.payment-info-next-step-button').attr('onclick', null);
 
@@ -127,4 +130,13 @@
             return false;
         });
     });
+
+    function toggleStoredCard() {
+        var selectedStoredCardId = $('#@Html.IdFor(model => model.StoredCardId)').val();
+        if (!selectedStoredCardId || selectedStoredCardId == '0') {
+            $('#nmi-card-details').show();
+        } else {
+            $('#nmi-card-details').hide();
+        }
+    }
 </script>

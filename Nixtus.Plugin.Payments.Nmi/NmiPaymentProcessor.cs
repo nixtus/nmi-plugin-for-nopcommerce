@@ -108,7 +108,7 @@ namespace Nixtus.Plugin.Payments.Nmi
         {
             var result = new ProcessPaymentResult();
             var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
-            var saveCustomer = Convert.ToBoolean(processPaymentRequest.CustomValues[Constants.SaveCustomerKey].ToString());
+            
 
             var values = new Dictionary<string, string>
             {
@@ -125,6 +125,8 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
 
+            var saveCustomer = Convert.ToBoolean(processPaymentRequest.CustomValues[Constants.SaveCustomerKey].ToString());
+
             if (_nmiPaymentSettings.AllowCustomerToSaveCards && saveCustomer)
             {
                 var existingCustomerVaultId = customer.GetAttribute<string>(Constants.CustomerVaultIdKey);
@@ -137,6 +139,12 @@ namespace Nixtus.Plugin.Payments.Nmi
                 {
                     values.Add("customer_vault", "update_customer");
                 }
+            }
+
+            if (processPaymentRequest.CustomValues.TryGetValue(Constants.StoredCardKey, out object storedCardId) &&
+                !storedCardId.ToString().Equals("0"))
+            {
+                // TODO: how to apply card ID to the NMI post request
             }
 
             // add security key or username/password
@@ -571,8 +579,11 @@ namespace Nixtus.Plugin.Payments.Nmi
             if (form.TryGetValue("Token", out StringValues token) && !StringValues.IsNullOrEmpty(token))
                 paymentRequest.CustomValues.Add(Constants.CardToken, token.ToString());
 
-            if (form.TryGetValue("SaveCustomer", out StringValues saveCustomer) && !StringValues.IsNullOrEmpty(saveCustomer))
-                paymentRequest.CustomValues.Add(Constants.SaveCustomerKey, saveCustomer.ToString());
+            if (form.TryGetValue("StoredCardId", out StringValues storedCardId) && !StringValues.IsNullOrEmpty(storedCardId) && !storedCardId.Equals("0"))
+                paymentRequest.CustomValues.Add(Constants.StoredCardKey, storedCardId.ToString());
+
+            if (form.TryGetValue("SaveCustomer", out StringValues saveCustomerValue) && !StringValues.IsNullOrEmpty(saveCustomerValue) && bool.TryParse(saveCustomerValue[0], out bool saveCustomer) && saveCustomer)
+                paymentRequest.CustomValues.Add(Constants.SaveCustomerKey, saveCustomer);
 
             return paymentRequest;
         }
@@ -625,8 +636,6 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint", "If enabled username/password will be used for authentication to the payment API instead of the security key");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards", "Allow Customers To Store Cards");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint", "If enabled registered customers will be able to save cards for future use.  Also, you must enter the username/password for this functionality to be available.");
-
-            //Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription", "Pay by credit / debit card");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer", "Save card information");
 
@@ -660,6 +669,8 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint");
 
             base.Uninstall();
         }

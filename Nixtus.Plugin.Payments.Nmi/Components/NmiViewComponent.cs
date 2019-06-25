@@ -75,8 +75,8 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
                             {
                                 Value = billing.Id,
                                 Text = $"{billing.CcNumber} " +
-                                       $"(Exp. ${billing.CcExp.Substring(0, 2)}/" +
-                                       $"{billing.CcExp.Substring(2, 2)}"
+                                       $"(Exp. {billing.CcExp.Substring(0, 2)}/" +
+                                       $"{billing.CcExp.Substring(2, 2)})"
                             });
                         }
                     }
