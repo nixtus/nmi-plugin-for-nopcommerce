@@ -41,7 +41,10 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
 
             if (_nmiPaymentSettings.AllowCustomerToSaveCards)
             {
-                PopulateStoredCards(model);
+                if (!string.IsNullOrEmpty(_workContext.CurrentCustomer.GetAttribute<string>(Constants.CustomerVaultIdKey)))
+                {
+                    PopulateStoredCards(model);
+                }
 
                 model.StoredCards.Insert(0, new SelectListItem { Text = "Select a card...", Value = "0" });
             }
