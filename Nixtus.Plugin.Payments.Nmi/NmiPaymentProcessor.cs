@@ -691,6 +691,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint", "If enabled registered customers will be able to save cards for future use.  Also, you must enter the username/password for this functionality to be available.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription", "Pay by credit / debit card");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer", "Save card information");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard", "Use a previously saved card");
 
             base.Install();
         }
@@ -724,6 +725,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard");
 
             base.Uninstall();
         }
