@@ -117,7 +117,8 @@
         addScript();
 
         $(".payment-info-next-step-button").on('click', (event) => {
-			if (formSubmitted) {
+            var selectedStoredCardId = $('#@Html.IdFor(model => model.StoredCardId)').val();
+			if (formSubmitted || (selectedStoredCardId && selectedStoredCardId !== '0')) {
 				// add form parameter so that the right action is hit
 				var input = $("<input>").attr("type", "hidden").attr("name", "nextstep").val("Next");
 				$("form[action='/checkout/paymentinfo']").append(input);
