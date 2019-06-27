@@ -20,6 +20,10 @@ namespace Nixtus.Plugin.Payments.Nmi.Models
         public bool UseUsernamePassword { get; set; }
         public bool UseUsernamePassword_OverrideForStore { get; set; }
 
+        [NopResourceDisplayName("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards")]
+        public bool AllowCustomerToSaveCards { get; set; }
+        public bool AllowCustomerToSaveCards_OverrideForStore { get; set; }
+
         [NopResourceDisplayName("Plugins.Payments.Nmi.Fields.SecurityKey")]
         public string SecurityKey { get; set; }
         public bool SecurityKey_OverrideForStore { get; set; }

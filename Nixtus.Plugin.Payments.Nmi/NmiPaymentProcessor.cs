@@ -8,9 +8,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 using Nop.Core;
 using Nop.Core.Domain.Catalog;
+using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
 using Nop.Core.Plugins;
+using Nop.Services.Common;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
 using Nop.Services.Localization;
@@ -37,6 +39,7 @@ namespace Nixtus.Plugin.Payments.Nmi
         private readonly ILogger _logger;
         private readonly NmiPaymentSettings _nmiPaymentSettings;
         private readonly ILocalizationService _localizationService;
+        private readonly IGenericAttributeService _genericAttributeService;
 
         #endregion
 
@@ -48,7 +51,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             IOrderTotalCalculationService orderTotalCalculationService,
             ILogger logger,
             NmiPaymentSettings nmiPaymentSettings,
-            ILocalizationService localizationService)
+            ILocalizationService localizationService, IGenericAttributeService genericAttributeService)
         {
             _nmiPaymentSettings = nmiPaymentSettings;
             _settingService = settingService;
@@ -57,6 +60,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             _orderTotalCalculationService = orderTotalCalculationService;
             _logger = logger;
             _localizationService = localizationService;
+            _genericAttributeService = genericAttributeService;
         }
 
         #endregion
@@ -92,6 +96,65 @@ namespace Nixtus.Plugin.Payments.Nmi
                 values.Add("security_key", _nmiPaymentSettings.SecurityKey);
             }
         }
+
+        /// <summary>
+        /// Add customer vault values to payment request, if enabled
+        /// </summary>
+        /// <param name="processPaymentRequest"></param>
+        /// <param name="customer"></param>
+        /// <param name="values"></param>
+        /// <returns>True - if saving customer is enabled, else False</returns>
+        private bool AddCustomerVaultValues(ProcessPaymentRequest processPaymentRequest, Customer customer, IDictionary<string, string> values)
+        {
+            var saveCustomerKeySuccess = processPaymentRequest.CustomValues.TryGetValue(Constants.SaveCustomerKey, out object saveCustomerKey);
+            var saveCustomer = Convert.ToBoolean(saveCustomerKeySuccess ? saveCustomerKey.ToString() : "false");
+            if (_nmiPaymentSettings.AllowCustomerToSaveCards && saveCustomer)
+            {
+                var existingCustomerVaultId = customer.GetAttribute<string>(Constants.CustomerVaultIdKey);
+                if (string.IsNullOrEmpty(existingCustomerVaultId))
+                {
+                    values.Add("customer_vault", "add_customer");
+                    values.Add("customer_vault_id", customer.CustomerGuid.ToString());
+                }
+                else
+                {
+                    values.Add("customer_vault", "update_customer");
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Add stored card details if customer selected to use a stored card
+        /// </summary>
+        /// <param name="processPaymentRequest"></param>
+        /// <param name="customer"></param>
+        /// <param name="values"></param>
+        private void AddStoredCardValues(ProcessPaymentRequest processPaymentRequest, Customer customer, IDictionary<string, string> values)
+        {
+            if (processPaymentRequest.CustomValues.TryGetValue(Constants.StoredCardKey, out object storedCardId) &&
+                !storedCardId.ToString().Equals("0"))
+            {
+                var existingCustomerVaultId = customer.GetAttribute<string>(Constants.CustomerVaultIdKey);
+                if (!string.IsNullOrEmpty(existingCustomerVaultId))
+                {
+                    values.Add("customer_vault_id", existingCustomerVaultId);
+                }
+                else
+                {
+                    _logger.Warning("Customer tried use a stored card but did not have a customer vault ID saved");
+                }
+
+                values.Add("billing_id", storedCardId.ToString());
+            }
+            else
+            {
+                values.Add("payment_token", processPaymentRequest.CustomValues[Constants.CardToken].ToString());
+            }
+        }
         #endregion
 
         #region Methods
@@ -105,6 +168,7 @@ namespace Nixtus.Plugin.Payments.Nmi
         {
             var result = new ProcessPaymentResult();
             var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
+
             var values = new Dictionary<string, string>
             {
                 { "payment", "creditcard" },
@@ -115,10 +179,15 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "city", customer.BillingAddress.City },
                 { "state", customer.BillingAddress.StateProvince.Abbreviation },
                 { "zip", customer.BillingAddress.ZipPostalCode.Substring(0, 5) },
-                { "payment_token", processPaymentRequest.CustomValues[Constants.CardToken].ToString() },
                 { "amount", processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) },
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
+
+            // save customer card if needed
+            var saveCustomer = AddCustomerVaultValues(processPaymentRequest, customer, values);
+
+            // determine if we need to used the stored card or the token generated from the new card
+            AddStoredCardValues(processPaymentRequest, customer, values);
 
             // add security key or username/password
             AddSecurityValues(values);
@@ -143,6 +212,12 @@ namespace Nixtus.Plugin.Payments.Nmi
                     result.NewPaymentStatus = _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture
                         ? PaymentStatus.Paid
                         : PaymentStatus.Authorized;
+
+                    // save customer vault id, if needed
+                    if (saveCustomer)
+                    {
+                        _genericAttributeService.SaveAttribute(customer, Constants.CustomerVaultIdKey, customer.CustomerGuid.ToString());
+                    }
                 }
                 // transaction declined or error - responseValue = 2 or 3
                 else
@@ -378,10 +453,15 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "city", customer.BillingAddress.City },
                 { "state", customer.BillingAddress.StateProvince.Abbreviation },
                 { "zip", customer.BillingAddress.ZipPostalCode.Substring(0, 5) },
-                { "payment_token", processPaymentRequest.CustomValues[Constants.CardToken].ToString() },
                 { "amount",  orderTotal },
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
+
+            // save customer card if needed
+            var saveCustomer = AddCustomerVaultValues(processPaymentRequest, customer, values);
+
+            // determine if we need to used the stored card or the token generated from the new card
+            AddStoredCardValues(processPaymentRequest, customer, values);
 
             // add security key or username/password
             AddSecurityValues(values);
@@ -438,6 +518,12 @@ namespace Nixtus.Plugin.Payments.Nmi
                     result.NewPaymentStatus = _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture
                         ? PaymentStatus.Paid
                         : PaymentStatus.Authorized;
+
+                    // save customer vault id, if needed
+                    if (saveCustomer)
+                    {
+                        _genericAttributeService.SaveAttribute(customer, Constants.CustomerVaultIdKey, customer.CustomerGuid.ToString());
+                    }
                 }
                 // transaction declined or error - responseValue = 2 or 3
                 else
@@ -546,6 +632,12 @@ namespace Nixtus.Plugin.Payments.Nmi
             if (form.TryGetValue("Token", out StringValues token) && !StringValues.IsNullOrEmpty(token))
                 paymentRequest.CustomValues.Add(Constants.CardToken, token.ToString());
 
+            if (form.TryGetValue("StoredCardId", out StringValues storedCardId) && !StringValues.IsNullOrEmpty(storedCardId) && !storedCardId.Equals("0"))
+                paymentRequest.CustomValues.Add(Constants.StoredCardKey, storedCardId.ToString());
+
+            if (form.TryGetValue("SaveCustomer", out StringValues saveCustomerValue) && !StringValues.IsNullOrEmpty(saveCustomerValue) && bool.TryParse(saveCustomerValue[0], out bool saveCustomer) && saveCustomer)
+                paymentRequest.CustomValues.Add(Constants.SaveCustomerKey, saveCustomer);
+
             return paymentRequest;
         }
 
@@ -594,8 +686,12 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword", "Use username/password");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint", "If enabled username/password will be used for authentication instead of the security key");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint", "If enabled username/password will be used for authentication to the payment API instead of the security key");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards", "Allow Customers To Store Cards");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint", "If enabled registered customers will be able to save cards for future use.  Also, you must enter the username/password for this functionality to be available.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription", "Pay by credit / debit card");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer", "Save card information");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard", "Use a previously saved card");
 
             base.Install();
         }
@@ -626,6 +722,10 @@ namespace Nixtus.Plugin.Payments.Nmi
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard");
 
             base.Uninstall();
         }

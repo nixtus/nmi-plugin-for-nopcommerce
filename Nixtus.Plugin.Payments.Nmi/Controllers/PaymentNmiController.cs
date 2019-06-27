@@ -20,7 +20,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
         private readonly IStoreService _storeService;
         private readonly IWorkContext _workContext;
         private readonly IPermissionService _permissionService;
-        
+
         public PaymentNmiController(ILocalizationService localizationService,
             ISettingService settingService,
             IStoreService storeService,
@@ -50,6 +50,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
                 Username = nmiPaymentSettings.Username,
                 Password = nmiPaymentSettings.Password,
                 UseUsernamePassword = nmiPaymentSettings.UseUsernamePassword,
+                AllowCustomerToSaveCards = nmiPaymentSettings.AllowCustomerToSaveCards,
                 SecurityKey = nmiPaymentSettings.SecurityKey,
                 CollectJsTokenizationKey = nmiPaymentSettings.CollectJsTokenizationKey,
                 TransactModeId = Convert.ToInt32(nmiPaymentSettings.TransactMode),
@@ -64,6 +65,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
                 model.Username_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.Username, storeScope);
                 model.Password_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.Password, storeScope);
                 model.UseUsernamePassword_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.UseUsernamePassword, storeScope);
+                model.AllowCustomerToSaveCards_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.AllowCustomerToSaveCards, storeScope);
                 model.SecurityKey_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.SecurityKey, storeScope);
                 model.CollectJsTokenizationKey_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.CollectJsTokenizationKey, storeScope);
                 model.TransactModeId_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.TransactMode, storeScope);
@@ -93,6 +95,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
             nmiPaymentSettings.Username = model.Username;
             nmiPaymentSettings.Password = model.Password;
             nmiPaymentSettings.UseUsernamePassword = model.UseUsernamePassword;
+            nmiPaymentSettings.AllowCustomerToSaveCards = model.AllowCustomerToSaveCards;
             nmiPaymentSettings.AdditionalFee = model.AdditionalFee;
             nmiPaymentSettings.AdditionalFeePercentage = model.AdditionalFeePercentage;
             nmiPaymentSettings.SecurityKey = model.SecurityKey;
@@ -110,6 +113,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
             _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.AdditionalFeePercentage, model.AdditionalFeePercentage_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.TransactMode, model.TransactModeId_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.UseUsernamePassword, model.UseUsernamePassword_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.AllowCustomerToSaveCards, model.AllowCustomerToSaveCards_OverrideForStore, storeScope, false);
 
             //now clear settings cache
             _settingService.ClearCache();

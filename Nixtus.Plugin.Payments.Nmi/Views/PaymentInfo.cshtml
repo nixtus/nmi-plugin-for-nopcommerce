@@ -14,7 +14,21 @@
     }
 </style>
 
-<table width="100%" cellspacing="2" cellpadding="1" border="0">
+@if (!Model.IsGuest && Model.AllowCustomerToSaveCards && Model.StoredCards.Any())
+{
+    <table width="100%" cellspacing="2" cellpadding="1" border="0">
+        <tr>
+            <td>
+                <label asp-for="StoredCardId">@T("Plugins.Payments.Nmi.Fields.StoredCard"):</label>
+            </td>
+            <td>
+                <select asp-for="StoredCardId" asp-items="Model.StoredCards" class="nmi-input"></select>
+            </td>
+        </tr>
+    </table>
+}
+
+<table width="100%" cellspacing="2" cellpadding="1" border="0" id="nmi-card-details">
     <tr>
         <td>
             @Html.LabelFor(model => model.CardNumber, false):
@@ -45,6 +59,18 @@
         <td></td>
         <td class="error" id="cvv-error"></td>
     </tr>
+    @if (!Model.IsGuest && Model.AllowCustomerToSaveCards)
+    {
+        <tr>
+            <td>
+                @Html.LabelFor(model => model.SaveCustomer, false):
+            </td>
+            <td>
+                <input type="checkbox" asp-for="SaveCustomer" />
+                <span asp-validation-for="SaveCustomer"></span>
+            </td>
+        </tr>
+    }
 </table>
 <input type="hidden" name="Token" id="Token" asp-for="Token">
 
@@ -82,13 +108,17 @@
     }
 
     $(document).ready(() => {
+        $('#@Html.IdFor(model => model.StoredCardId)').change(toggleStoredCard);
+        toggleStoredCard();
+
         //remove handler so we dont validate the form
         $('.payment-info-next-step-button').attr('onclick', null);
 
         addScript();
 
         $(".payment-info-next-step-button").on('click', (event) => {
-			if (formSubmitted) {
+            var selectedStoredCardId = $('#@Html.IdFor(model => model.StoredCardId)').val();
+			if (formSubmitted || (selectedStoredCardId && selectedStoredCardId !== '0')) {
 				// add form parameter so that the right action is hit
 				var input = $("<input>").attr("type", "hidden").attr("name", "nextstep").val("Next");
 				$("form[action='/checkout/paymentinfo']").append(input);
@@ -101,4 +131,13 @@
             return false;
         });
     });
+
+    function toggleStoredCard() {
+        var selectedStoredCardId = $('#@Html.IdFor(model => model.StoredCardId)').val();
+        if (!selectedStoredCardId || selectedStoredCardId == '0') {
+            $('#nmi-card-details').show();
+        } else {
+            $('#nmi-card-details').hide();
+        }
+    }
 </script>
