@@ -103,7 +103,7 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// <param name="processPaymentRequest"></param>
         /// <param name="customer"></param>
         /// <param name="values"></param>
-        /// <returns>True - if saving customer is enabled, else False</returns>
+        /// <returns>True - if saving new customer is enabled, else False</returns>
         private bool AddCustomerVaultValues(ProcessPaymentRequest processPaymentRequest, Customer customer, IDictionary<string, string> values)
         {
             var saveCustomerKeySuccess = processPaymentRequest.CustomValues.TryGetValue(Constants.SaveCustomerKey, out object saveCustomerKey);
@@ -115,13 +115,14 @@ namespace Nixtus.Plugin.Payments.Nmi
                 {
                     values.Add("customer_vault", "add_customer");
                     values.Add("customer_vault_id", customer.CustomerGuid.ToString());
-                }
-                else
-                {
-                    values.Add("customer_vault", "update_customer");
+                    return true;
                 }
 
-                return true;
+                // existing customer
+                // we already have the customer vault id saved, so we can just return false
+                values.Add("customer_vault", "update_customer");
+                values.Add("customer_vault_id", existingCustomerVaultId);
+                return false;
             }
 
             return false;
