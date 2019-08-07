@@ -219,6 +219,10 @@ namespace Nixtus.Plugin.Payments.Nmi
                     {
                         _genericAttributeService.SaveAttribute(customer, Constants.CustomerVaultIdKey, customer.CustomerGuid.ToString());
                     }
+
+                    // remove custom values so that they don't get saved on the order and also won't display
+                    // on the generated PDF
+                    processPaymentRequest.CustomValues = new Dictionary<string, object>();
                 }
                 // transaction declined or error - responseValue = 2 or 3
                 else
@@ -525,6 +529,10 @@ namespace Nixtus.Plugin.Payments.Nmi
                     {
                         _genericAttributeService.SaveAttribute(customer, Constants.CustomerVaultIdKey, customer.CustomerGuid.ToString());
                     }
+
+                    // remove custom values so that they don't get saved on the order and also won't display
+                    // on the generated PDF
+                    processPaymentRequest.CustomValues = new Dictionary<string, object>();
                 }
                 // transaction declined or error - responseValue = 2 or 3
                 else
