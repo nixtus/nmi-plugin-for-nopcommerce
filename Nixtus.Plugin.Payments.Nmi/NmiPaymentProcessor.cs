@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Net.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
@@ -108,14 +109,14 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// <param name="processPaymentRequest"></param>
         /// <param name="customer"></param>
         /// <param name="values"></param>
-        /// <returns>True - if saving new customer is enabled, else False</returns>
-        private bool AddCustomerVaultValues(ProcessPaymentRequest processPaymentRequest, Customer customer, IDictionary<string, string> values)
+        /// <returns>Task of boolean True - if saving new customer is enabled, else False</returns>
+        private async Task<bool> AddCustomerVaultValues(ProcessPaymentRequest processPaymentRequest, Customer customer, IDictionary<string, string> values)
         {
             var saveCustomerKeySuccess = processPaymentRequest.CustomValues.TryGetValue(Constants.SaveCustomerKey, out object saveCustomerKey);
             var saveCustomer = Convert.ToBoolean(saveCustomerKeySuccess ? saveCustomerKey.ToString() : "false");
             if (_nmiPaymentSettings.AllowCustomerToSaveCards && saveCustomer)
             {
-                var existingCustomerVaultId = _genericAttributeService.GetAttribute<string>(customer, Constants.CustomerVaultIdKey);
+                var existingCustomerVaultId = await _genericAttributeService.GetAttributeAsync<string>(customer, Constants.CustomerVaultIdKey);
                 if (string.IsNullOrEmpty(existingCustomerVaultId))
                 {
                     values.Add("customer_vault", "add_customer");
@@ -139,19 +140,19 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// <param name="processPaymentRequest"></param>
         /// <param name="customer"></param>
         /// <param name="values"></param>
-        private void AddStoredCardValues(ProcessPaymentRequest processPaymentRequest, Customer customer, IDictionary<string, string> values)
+        private async Task AddStoredCardValues(ProcessPaymentRequest processPaymentRequest, Customer customer, IDictionary<string, string> values)
         {
             if (processPaymentRequest.CustomValues.TryGetValue(Constants.StoredCardKey, out object storedCardId) &&
                 !storedCardId.ToString().Equals("0"))
             {
-                var existingCustomerVaultId = _genericAttributeService.GetAttribute<string>(customer, Constants.CustomerVaultIdKey);
+                var existingCustomerVaultId = await _genericAttributeService.GetAttributeAsync<string>(customer, Constants.CustomerVaultIdKey);
                 if (!string.IsNullOrEmpty(existingCustomerVaultId))
                 {
                     values.Add("customer_vault_id", existingCustomerVaultId);
                 }
                 else
                 {
-                    _logger.Warning("Customer tried use a stored card but did not have a customer vault ID saved");
+                    await _logger.WarningAsync("Customer tried use a stored card but did not have a customer vault ID saved");
                 }
 
                 values.Add("billing_id", storedCardId.ToString());
@@ -169,19 +170,22 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// Process a payment
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
-        /// <returns>Process payment result</returns>
-        public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the process payment result
+        /// </returns>
+        public async Task<ProcessPaymentResult> ProcessPaymentAsync(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
-            var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
-            var billingAddress = _customerService.GetCustomerBillingAddress(customer);
+            var customer = await _customerService.GetCustomerByIdAsync(processPaymentRequest.CustomerId);
+            var billingAddress = await _customerService.GetCustomerBillingAddressAsync(customer);
 
             if (customer == null || billingAddress == null)
             {
                 throw new NopException("Could not retrieve customer or billing address");
             }
 
-            var state = _stateProvinceService.GetStateProvinceById(billingAddress.StateProvinceId ?? 0);
+            var state = await _stateProvinceService.GetStateProvinceByIdAsync(billingAddress.StateProvinceId ?? 0);
 
             var values = new Dictionary<string, string>
             {
@@ -198,10 +202,10 @@ namespace Nixtus.Plugin.Payments.Nmi
             };
 
             // save customer card if needed
-            var saveCustomer = AddCustomerVaultValues(processPaymentRequest, customer, values);
+            var saveCustomer = await AddCustomerVaultValues(processPaymentRequest, customer, values);
 
             // determine if we need to used the stored card or the token generated from the new card
-            AddStoredCardValues(processPaymentRequest, customer, values);
+            await AddStoredCardValues(processPaymentRequest, customer, values);
 
             // add security key or username/password
             AddSecurityValues(values);
@@ -230,7 +234,7 @@ namespace Nixtus.Plugin.Payments.Nmi
                     // save customer vault id, if needed
                     if (saveCustomer)
                     {
-                        _genericAttributeService.SaveAttribute(customer, Constants.CustomerVaultIdKey, customer.CustomerGuid.ToString());
+                        await _genericAttributeService.SaveAttributeAsync(customer, Constants.CustomerVaultIdKey, customer.CustomerGuid.ToString());
                     }
 
                     // remove custom values so that they don't get saved on the order and also won't display
@@ -245,7 +249,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             }
             catch (Exception exception)
             {
-                _logger.Error("NMI Direct Post Error", exception, customer);
+                await _logger.ErrorAsync("NMI Direct Post Error", exception, customer);
                 result.AddError("Exception Occurred: " + exception.Message);
                 return result;
             }
@@ -257,41 +261,51 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// Post process payment (used by payment gateways that require redirecting to a third-party URL)
         /// </summary>
         /// <param name="postProcessPaymentRequest">Payment info required for an order processing</param>
-        public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public Task PostProcessPaymentAsync(PostProcessPaymentRequest postProcessPaymentRequest)
         {
             //nothing
+            return Task.CompletedTask;
         }
 
         /// <summary>
         /// Gets additional handling fee
         /// </summary>
-        /// <param name="cart">Shoping cart</param>
-        /// <returns>Additional handling fee</returns>
-        public decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the additional handling fee
+        /// </returns>
+        public async Task<decimal> GetAdditionalHandlingFeeAsync(IList<ShoppingCartItem> cart)
         {
-            return _paymentService.CalculateAdditionalFee(cart,
+            return await _paymentService.CalculateAdditionalFeeAsync(cart,
                 _nmiPaymentSettings.AdditionalFee, _nmiPaymentSettings.AdditionalFeePercentage);
         }
 
         /// <summary>
         /// Returns a value indicating whether payment method should be hidden during checkout
         /// </summary>
-        /// <param name="cart">Shoping cart</param>
-        /// <returns>true - hide; false - display.</returns>
-        public bool HidePaymentMethod(IList<ShoppingCartItem> cart)
+        /// <param name="cart">Shopping cart</param>
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the rue - hide; false - display.
+        /// </returns>
+        public Task<bool> HidePaymentMethodAsync(IList<ShoppingCartItem> cart)
         {
             //you can put any logic here
             //for example, hide this payment method if all products in the cart are downloadable
             //or hide this payment method if current customer is from certain country
-            return false;
+            return Task.FromResult(false);
         }
 
         /// <summary>
         /// Captures payment
         /// </summary>
         /// <param name="capturePaymentRequest">Capture payment request</param>
-        /// <returns>Capture payment result</returns>
-        public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the capture payment result
+        /// </returns>
+        public async Task<CapturePaymentResult> CaptureAsync(CapturePaymentRequest capturePaymentRequest)
         {
             var result = new CapturePaymentResult();
 
@@ -309,9 +323,10 @@ namespace Nixtus.Plugin.Payments.Nmi
 
             try
             {
-                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
+                var response = await _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values));
 
-                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+                var content = await response.Content.ReadAsStringAsync();
+                var responseValues = ExtractResponseValues(content);
 
                 var responseValue = responseValues["response"];
 
@@ -330,7 +345,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             }
             catch (Exception exception)
             {
-                _logger.Error("NMI Direct Post Error", exception);
+                await _logger.ErrorAsync("NMI Direct Post Error", exception);
                 result.AddError("Exception Occurred: " + exception.Message);
                 return result;
             }
@@ -342,8 +357,11 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// Refunds a payment
         /// </summary>
         /// <param name="refundPaymentRequest">Request</param>
-        /// <returns>Result</returns>
-        public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the result
+        /// </returns>
+        public async Task<RefundPaymentResult> RefundAsync(RefundPaymentRequest refundPaymentRequest)
         {
             var result = new RefundPaymentResult();
 
@@ -364,9 +382,10 @@ namespace Nixtus.Plugin.Payments.Nmi
 
             try
             {
-                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
+                var response = await _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values));
 
-                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+                var content = await response.Content.ReadAsStringAsync();
+                var responseValues = ExtractResponseValues(content);
 
                 var responseValue = responseValues["response"];
 
@@ -387,7 +406,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             }
             catch (Exception exception)
             {
-                _logger.Error("NMI Direct Post Error", exception);
+                await _logger.ErrorAsync("NMI Direct Post Error", exception);
                 result.AddError("Exception Occurred: " + exception.Message);
                 return result;
             }
@@ -399,8 +418,11 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// Voids a payment
         /// </summary>
         /// <param name="voidPaymentRequest">Request</param>
-        /// <returns>Result</returns>
-        public VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the result
+        /// </returns>
+        public async Task<VoidPaymentResult> VoidAsync(VoidPaymentRequest voidPaymentRequest)
         {
             var result = new VoidPaymentResult();
 
@@ -420,9 +442,10 @@ namespace Nixtus.Plugin.Payments.Nmi
 
             try
             {
-                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
+                var response = await _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values));
 
-                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+                var content = await response.Content.ReadAsStringAsync();
+                var responseValues = ExtractResponseValues(content);
 
                 var responseValue = responseValues["response"];
 
@@ -439,7 +462,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             }
             catch (Exception exception)
             {
-                _logger.Error("NMI Direct Post Error", exception);
+                await _logger.ErrorAsync("NMI Direct Post Error", exception);
                 result.AddError("Exception Occurred: " + exception.Message);
                 return result;
             }
@@ -451,20 +474,23 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// Process recurring payment
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
-        /// <returns>Process payment result</returns>
-        public ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the process payment result
+        /// </returns>
+        public async Task<ProcessPaymentResult> ProcessRecurringPaymentAsync(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
 
-            var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
-            var billingAddress = _customerService.GetCustomerBillingAddress(customer);
+            var customer = await _customerService.GetCustomerByIdAsync(processPaymentRequest.CustomerId);
+            var billingAddress = await _customerService.GetCustomerBillingAddressAsync(customer);
 
             if (customer == null || billingAddress == null)
             {
                 throw new NopException("Could not retrieve customer or billing address");
             }
 
-            var state = _stateProvinceService.GetStateProvinceById(billingAddress.StateProvinceId ?? 0);
+            var state = await _stateProvinceService.GetStateProvinceByIdAsync(billingAddress.StateProvinceId ?? 0);
 
             var orderTotal = processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture);
 
@@ -483,10 +509,10 @@ namespace Nixtus.Plugin.Payments.Nmi
             };
 
             // save customer card if needed
-            var saveCustomer = AddCustomerVaultValues(processPaymentRequest, customer, values);
+            var saveCustomer = await AddCustomerVaultValues(processPaymentRequest, customer, values);
 
             // determine if we need to used the stored card or the token generated from the new card
-            AddStoredCardValues(processPaymentRequest, customer, values);
+            await AddStoredCardValues(processPaymentRequest, customer, values);
 
             // add security key or username/password
             AddSecurityValues(values);
@@ -526,9 +552,10 @@ namespace Nixtus.Plugin.Payments.Nmi
 
             try
             {
-                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
+                var response = await _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values));
 
-                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+                var content = await response.Content.ReadAsStringAsync();
+                var responseValues = ExtractResponseValues(content);
 
                 var responseValue = responseValues["response"];
 
@@ -547,7 +574,7 @@ namespace Nixtus.Plugin.Payments.Nmi
                     // save customer vault id, if needed
                     if (saveCustomer)
                     {
-                        _genericAttributeService.SaveAttribute(customer, Constants.CustomerVaultIdKey, customer.CustomerGuid.ToString());
+                        await _genericAttributeService.SaveAttributeAsync(customer, Constants.CustomerVaultIdKey, customer.CustomerGuid.ToString());
                     }
 
                     // remove custom values so that they don't get saved on the order and also won't display
@@ -562,7 +589,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             }
             catch (Exception exception)
             {
-                _logger.Error("NMI Direct Post Error", exception, customer);
+                await _logger.ErrorAsync("NMI Direct Post Error", exception, customer);
                 result.AddError("Exception Occurred: " + exception.Message);
                 return result;
             }
@@ -574,8 +601,11 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// Cancels a recurring payment
         /// </summary>
         /// <param name="cancelPaymentRequest">Request</param>
-        /// <returns>Result</returns>
-        public CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the result
+        /// </returns>
+        public async Task<CancelRecurringPaymentResult> CancelRecurringPaymentAsync(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
             var result = new CancelRecurringPaymentResult();
             var values = new Dictionary<string, string>
@@ -590,9 +620,10 @@ namespace Nixtus.Plugin.Payments.Nmi
 
             try
             {
-                var response = _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values)).Result;
+                var response = await _httpClient.PostAsync(NMI_DIRECT_POST_URL, new FormUrlEncodedContent(values));
 
-                var responseValues = ExtractResponseValues(response.Content.ReadAsStringAsync().Result);
+                var content = await response.Content.ReadAsStringAsync();
+                var responseValues = ExtractResponseValues(content);
 
                 var responseValue = responseValues["response"];
 
@@ -609,7 +640,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             }
             catch (Exception exception)
             {
-                _logger.Error("NMI Direct Post Error", exception);
+                await _logger.ErrorAsync("NMI Direct Post Error", exception);
                 result.AddError("Exception Occurred: " + exception.Message);
                 return result;
             }
@@ -621,39 +652,53 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// Gets a value indicating whether customers can complete a payment after order is placed but not completed (for redirection payment methods)
         /// </summary>
         /// <param name="order">Order</param>
-        /// <returns>Result</returns>
-        public bool CanRePostProcessPayment(Order order)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the result
+        /// </returns>
+        public Task<bool> CanRePostProcessPaymentAsync(Order order)
         {
             if (order == null)
                 throw new ArgumentNullException(nameof(order));
 
             //it's not a redirection payment method. So we always return false
-            return false;
+            return Task.FromResult(false);
         }
 
         /// <summary>
         /// Validate payment form
         /// </summary>
         /// <param name="form">The parsed form values</param>
-        /// <returns>List of validating errors</returns>
-        public IList<string> ValidatePaymentForm(IFormCollection form)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the list of validating errors
+        /// </returns>
+        public Task<IList<string>> ValidatePaymentFormAsync(IFormCollection form)
         {
             if (form == null)
                 throw new ArgumentException(nameof(form));
 
+
+            var warnings = new List<string>();
+
             //try to get errors
             if (form.TryGetValue("Errors", out StringValues errorsString) && !StringValues.IsNullOrEmpty(errorsString))
-                return new[] { errorsString.ToString() }.ToList();
+            {
+                warnings.Add(errorsString.ToString());
+            }
 
-            return new List<string>();
+            return Task.FromResult<IList<string>>(warnings);
         }
 
         /// <summary>
         /// Get payment information
         /// </summary>
         /// <param name="form">The parsed form values</param>
-        /// <returns>Payment info holder</returns>
-        public ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the payment info holder
+        /// </returns>
+        public Task<ProcessPaymentRequest> GetPaymentInfoAsync(IFormCollection form)
         {
             var paymentRequest = new ProcessPaymentRequest();
 
@@ -667,7 +712,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             if (form.TryGetValue("SaveCustomer", out StringValues saveCustomerValue) && !StringValues.IsNullOrEmpty(saveCustomerValue) && bool.TryParse(saveCustomerValue[0], out bool saveCustomer) && saveCustomer)
                 paymentRequest.CustomValues.Add(Constants.SaveCustomerKey, saveCustomer);
 
-            return paymentRequest;
+            return Task.FromResult(paymentRequest);
         }
 
         /// <summary>
@@ -690,9 +735,10 @@ namespace Nixtus.Plugin.Payments.Nmi
         }
 
         /// <summary>
-        /// Install plugin
+        /// Install the plugin
         /// </summary>
-        public override void Install()
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public override async Task InstallAsync()
         {
             //settings
             var settings = new NmiPaymentSettings
@@ -702,66 +748,63 @@ namespace Nixtus.Plugin.Payments.Nmi
                 UseUsernamePassword = false,
                 TransactMode = TransactMode.AuthorizeAndCapture
             };
-            _settingService.SaveSetting(settings);
+            await _settingService.SaveSettingAsync(settings);
 
             //locales
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username", "Username");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username.Hint", "Username assigned to the merchant account");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password", "Password");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password.Hint", "Password assigned to the merchant account");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey", "Security Key");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey.Hint", "API security key assigned to the merchant account, using this combined with username/password will result in an error.  If you want to save cards, then select that checkbox and enter username/password");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey", "Collect JS Tokenization Key");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey.Hint", "Tokenization key used for Collect.js library");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues", "Transaction mode");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues.Hint", "Choose transaction mode.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee", "Additional fee");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword", "Use username/password");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint", "If enabled username/password will be used for authentication to the payment API instead of the security key");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards", "Allow Customers To Store Cards");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint", "If enabled registered customers will be able to save cards for future use.  Also, you must enter the username/password for this functionality to be available.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription", "Pay by credit / debit card");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer", "Save card information");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard", "Use a previously saved card");
+            await _localizationService.AddLocaleResourceAsync(new Dictionary<string, string>
+            {
+                ["Plugins.Payments.Nmi.Fields.Username"] = "Username",
+                ["Plugins.Payments.Nmi.Fields.Username.Hint"] = "Username assigned to the merchant account",
+                ["Plugins.Payments.Nmi.Fields.Password"] = "Password",
+                ["Plugins.Payments.Nmi.Fields.Password.Hint"] = "Password assigned to the merchant account",
+                ["Plugins.Payments.Nmi.Fields.SecurityKey"] = "Security Key",
+                ["Plugins.Payments.Nmi.Fields.SecurityKey.Hint"] = "API security key assigned to the merchant account, using this combined with username/password will result in an error.  If you want to save cards, then select that checkbox and enter username/password",
+                ["Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey"] = "Collect JS Tokenization Key",
+                ["Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey.Hint"] = "Tokenization key used for Collect.js library",
+                ["Plugins.Payments.Nmi.Fields.TransactModeValues"] = "Transaction mode",
+                ["Plugins.Payments.Nmi.Fields.TransactModeValues.Hint"] = "Choose transaction mode.",
+                ["Plugins.Payments.Nmi.Fields.AdditionalFee"] = "Additional fee",
+                ["Plugins.Payments.Nmi.Fields.AdditionalFee.Hint"] = "Enter additional fee to charge your customers.",
+                ["Plugins.Payments.Nmi.Fields.AdditionalFeePercentage"] = "Additional fee. Use percentage",
+                ["Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint"] = "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.",
+                ["Plugins.Payments.Nmi.Fields.UseUsernamePassword"] = "Use username/password",
+                ["Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint"] = "If enabled username/password will be used for authentication to the payment API instead of the security key",
+                ["Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards"] = "Allow Customers To Store Cards",
+                ["Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint"] = "If enabled registered customers will be able to save cards for future use.  Also, you must enter the username/password for this functionality to be available.",
+                ["Plugins.Payments.Nmi.PaymentMethodDescription"] = "Pay by credit / debit card",
+                ["Plugins.Payments.Nmi.SaveCustomer"] = "Save card information",
+                ["Plugins.Payments.Nmi.Fields.StoredCard"] = "Use a previously saved card"
+            });
 
-            base.Install();
+            await base.InstallAsync();
         }
 
         /// <summary>
-        /// Uninstall plugin
+        /// Uninstall the plugin
         /// </summary>
-        public override void Uninstall()
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public override async Task UninstallAsync()
         {
             //settings
-            _settingService.DeleteSetting<NmiPaymentSettings>();
+            await _settingService.DeleteSettingAsync<NmiPaymentSettings>();
 
             //locales
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint");
-            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard");
+            await _localizationService.DeleteLocaleResourcesAsync("Plugins.Payments.Nmi");
 
-            base.Uninstall();
+            await base.UninstallAsync();
+        }
+
+        /// <summary>
+        /// Gets a payment method description that will be displayed on checkout pages in the public store
+        /// </summary>
+        /// <remarks>
+        /// return description of this payment method to be display on "payment method" checkout step. good practice is to make it localizable
+        /// for example, for a redirection payment method, description may be like this: "You will be redirected to PayPal site to complete the payment"
+        /// </remarks>
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public async Task<string> GetPaymentMethodDescriptionAsync()
+        {
+            return await _localizationService.GetResourceAsync("Plugins.Payments.Nmi.PaymentMethodDescription");
         }
 
         #endregion
@@ -802,11 +845,6 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// Gets a value indicating whether we should display a payment information page for this plugin
         /// </summary>
         public bool SkipPaymentInfo => false;
-
-        /// <summary>
-        /// Gets a payment method description that will be displayed on checkout pages in the public store
-        /// </summary>
-        public string PaymentMethodDescription => _localizationService.GetResource("Plugins.Payments.Nmi.PaymentMethodDescription");
 
         #endregion
     }

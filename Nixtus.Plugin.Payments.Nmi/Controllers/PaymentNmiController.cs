@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Nixtus.Plugin.Payments.Nmi.Models;
 using Nop.Core;
@@ -14,6 +15,9 @@ using Nop.Web.Framework.Mvc.Filters;
 
 namespace Nixtus.Plugin.Payments.Nmi.Controllers
 {
+    [AuthorizeAdmin]
+    [Area(AreaNames.Admin)]
+    [AutoValidateAntiforgeryToken]
     public class PaymentNmiController : BasePaymentController
     {
         private readonly ILocalizationService _localizationService;
@@ -39,16 +43,14 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
             _notificationService = notificationService;
         }
 
-        [AuthorizeAdmin]
-        [Area(AreaNames.Admin)]
-        public IActionResult Configure()
+        public async Task<IActionResult> Configure()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
-            var nmiPaymentSettings = _settingService.LoadSetting<NmiPaymentSettings>(storeScope);
+            var storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
+            var nmiPaymentSettings = await _settingService.LoadSettingAsync<NmiPaymentSettings>(storeScope);
 
             var model = new ConfigurationModel
             {
@@ -59,7 +61,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
                 SecurityKey = nmiPaymentSettings.SecurityKey,
                 CollectJsTokenizationKey = nmiPaymentSettings.CollectJsTokenizationKey,
                 TransactModeId = Convert.ToInt32(nmiPaymentSettings.TransactMode),
-                TransactModeValues = nmiPaymentSettings.TransactMode.ToSelectList(),
+                TransactModeValues = await nmiPaymentSettings.TransactMode.ToSelectListAsync(),
                 AdditionalFee = nmiPaymentSettings.AdditionalFee,
                 AdditionalFeePercentage = nmiPaymentSettings.AdditionalFeePercentage,
                 ActiveStoreScopeConfiguration = storeScope
@@ -67,34 +69,32 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
 
             if (storeScope > 0)
             {
-                model.Username_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.Username, storeScope);
-                model.Password_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.Password, storeScope);
-                model.UseUsernamePassword_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.UseUsernamePassword, storeScope);
-                model.AllowCustomerToSaveCards_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.AllowCustomerToSaveCards, storeScope);
-                model.SecurityKey_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.SecurityKey, storeScope);
-                model.CollectJsTokenizationKey_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.CollectJsTokenizationKey, storeScope);
-                model.TransactModeId_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.TransactMode, storeScope);
-                model.AdditionalFee_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.AdditionalFee, storeScope);
-                model.AdditionalFeePercentage_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
+                model.Username_OverrideForStore = await _settingService.SettingExistsAsync(nmiPaymentSettings, x => x.Username, storeScope);
+                model.Password_OverrideForStore = await _settingService.SettingExistsAsync(nmiPaymentSettings, x => x.Password, storeScope);
+                model.UseUsernamePassword_OverrideForStore = await _settingService.SettingExistsAsync(nmiPaymentSettings, x => x.UseUsernamePassword, storeScope);
+                model.AllowCustomerToSaveCards_OverrideForStore = await _settingService.SettingExistsAsync(nmiPaymentSettings, x => x.AllowCustomerToSaveCards, storeScope);
+                model.SecurityKey_OverrideForStore = await _settingService.SettingExistsAsync(nmiPaymentSettings, x => x.SecurityKey, storeScope);
+                model.CollectJsTokenizationKey_OverrideForStore = await _settingService.SettingExistsAsync(nmiPaymentSettings, x => x.CollectJsTokenizationKey, storeScope);
+                model.TransactModeId_OverrideForStore = await _settingService.SettingExistsAsync(nmiPaymentSettings, x => x.TransactMode, storeScope);
+                model.AdditionalFee_OverrideForStore = await _settingService.SettingExistsAsync(nmiPaymentSettings, x => x.AdditionalFee, storeScope);
+                model.AdditionalFeePercentage_OverrideForStore = await _settingService.SettingExistsAsync(nmiPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
             }
 
             return View("~/Plugins/Payments.Nmi/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
-        [AuthorizeAdmin]
-        [Area(AreaNames.Admin)]
-        public IActionResult Configure(ConfigurationModel model)
+        public async Task<IActionResult> Configure(ConfigurationModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
             if (!ModelState.IsValid)
-                return Configure();
+                return await Configure();
 
             //load settings for a chosen store scope
-            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
-            var nmiPaymentSettings = _settingService.LoadSetting<NmiPaymentSettings>(storeScope);
+            var storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
+            var nmiPaymentSettings = await _settingService.LoadSettingAsync<NmiPaymentSettings>(storeScope);
 
             //save settings
             nmiPaymentSettings.Username = model.Username;
@@ -110,22 +110,22 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
              * and loaded from database after each update */
-            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.Password, model.Password_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.Username, model.Username_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.SecurityKey, model.SecurityKey_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.CollectJsTokenizationKey, model.CollectJsTokenizationKey_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.AdditionalFee, model.AdditionalFee_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.AdditionalFeePercentage, model.AdditionalFeePercentage_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.TransactMode, model.TransactModeId_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.UseUsernamePassword, model.UseUsernamePassword_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.AllowCustomerToSaveCards, model.AllowCustomerToSaveCards_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(nmiPaymentSettings, x => x.Password, model.Password_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(nmiPaymentSettings, x => x.Username, model.Username_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(nmiPaymentSettings, x => x.SecurityKey, model.SecurityKey_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(nmiPaymentSettings, x => x.CollectJsTokenizationKey, model.CollectJsTokenizationKey_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(nmiPaymentSettings, x => x.AdditionalFee, model.AdditionalFee_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(nmiPaymentSettings, x => x.AdditionalFeePercentage, model.AdditionalFeePercentage_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(nmiPaymentSettings, x => x.TransactMode, model.TransactModeId_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(nmiPaymentSettings, x => x.UseUsernamePassword, model.UseUsernamePassword_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(nmiPaymentSettings, x => x.AllowCustomerToSaveCards, model.AllowCustomerToSaveCards_OverrideForStore, storeScope, false);
 
             //now clear settings cache
-            _settingService.ClearCache();
+            await _settingService.ClearCacheAsync();
 
-            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Admin.Plugins.Saved"));
 
-            return Configure();
+            return await Configure();
         }
     }
 }
