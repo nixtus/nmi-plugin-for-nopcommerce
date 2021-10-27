@@ -710,7 +710,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password", "Password");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password.Hint", "Password assigned to the merchant account");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey", "Security Key");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey.Hint", "API security key assigned to the merchant account, using this combined with username/password will result in an error");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey.Hint", "API security key assigned to the merchant account, using this combined with username/password will result in an error.  If you want to save cards, then select that checkbox and enter username/password");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey", "Collect JS Tokenization Key");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey.Hint", "Tokenization key used for Collect.js library");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues", "Transaction mode");
