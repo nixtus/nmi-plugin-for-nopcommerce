@@ -1,10 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc.Rendering;
 using Nop.Web.Framework.Mvc.ModelBinding;
-using Nop.Web.Framework.Mvc.Models;
 
 namespace Nixtus.Plugin.Payments.Nmi.Models
 {
-    public class ConfigurationModel : BaseNopModel
+    public class ConfigurationModel
     {
         public int ActiveStoreScopeConfiguration { get; set; }
 

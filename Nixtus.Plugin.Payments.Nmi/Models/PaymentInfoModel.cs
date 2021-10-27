@@ -1,17 +1,16 @@
 ﻿using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Nop.Web.Framework.Mvc.ModelBinding;
-using Nop.Web.Framework.Mvc.Models;
 
 namespace Nixtus.Plugin.Payments.Nmi.Models
 {
-    public class PaymentInfoModel : BaseNopModel
+    public class PaymentInfoModel
     {
         public PaymentInfoModel()
         {
             StoredCards = new List<SelectListItem>();
         }
-        
+
         // These properties are only used to display label on the payment info screen
         [NopResourceDisplayName("Payment.CardNumber")]
         public string CardNumber { get; set; }

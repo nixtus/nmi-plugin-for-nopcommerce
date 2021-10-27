@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <Copyright>Copyright © Nixtus, LLC</Copyright> 
     <Company>Nixtus, LLC</Company> 
     <Authors>Nixtus, LLC</Authors> 
-    <Version>1.00</Version> 
+    <Version>1.30</Version> 
     <Description>This plugin allows paying with NMI (Network Merchants Inc)</Description> 
     <PackageLicenseUrl></PackageLicenseUrl> 
     <PackageProjectUrl></PackageProjectUrl> 
@@ -50,6 +50,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Presentation\Nop.Web.Framework\Nop.Web.Framework.csproj" />
+    <ClearPluginAssemblies Include="$(MSBuildProjectDirectory)\..\..\Build\ClearPluginAssemblies.proj" />
   </ItemGroup>
   
   <!-- This target execute after "Build" target -->

@@ -8,8 +8,8 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Nixtus.Plugin.Payments.Nmi.Dtos;
 using Nixtus.Plugin.Payments.Nmi.Models;
 using Nop.Core;
-using Nop.Core.Domain.Customers;
 using Nop.Services.Common;
+using Nop.Services.Customers;
 using Nop.Services.Logging;
 using Nop.Web.Framework.Components;
 
@@ -21,27 +21,32 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
         private readonly IWorkContext _workContext;
         private readonly ILogger _logger;
         private readonly NmiPaymentSettings _nmiPaymentSettings;
+        private readonly ICustomerService _customerService;
+        private readonly IGenericAttributeService _genericAttributeService;
         private readonly HttpClient _httpClient = new HttpClient();
         private const string NMI_QUERY_URL = "https://msgpay.transactiongateway.com/api/query.php";
 
-        public NmiViewComponent(IWorkContext workContext, ILogger logger, NmiPaymentSettings nmiPaymentSettings)
+        public NmiViewComponent(IWorkContext workContext, ILogger logger, NmiPaymentSettings nmiPaymentSettings,
+            ICustomerService customerService, IGenericAttributeService genericAttributeService)
         {
             _workContext = workContext;
             _logger = logger;
             _nmiPaymentSettings = nmiPaymentSettings;
+            _customerService = customerService;
+            _genericAttributeService = genericAttributeService;
         }
 
         public IViewComponentResult Invoke()
         {
             var model = new PaymentInfoModel
             {
-                IsGuest = _workContext.CurrentCustomer.IsGuest(),
+                IsGuest = _customerService.IsGuest(_workContext.CurrentCustomer),
                 AllowCustomerToSaveCards = _nmiPaymentSettings.AllowCustomerToSaveCards
             };
 
             if (_nmiPaymentSettings.AllowCustomerToSaveCards)
             {
-                if (!string.IsNullOrEmpty(_workContext.CurrentCustomer.GetAttribute<string>(Constants.CustomerVaultIdKey)))
+                if (!string.IsNullOrEmpty(_genericAttributeService.GetAttribute<string>(_workContext.CurrentCustomer, Constants.CustomerVaultIdKey)))
                 {
                     PopulateStoredCards(model);
                 }
@@ -61,7 +66,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
                     { "username", _nmiPaymentSettings.Username },
                     { "password", _nmiPaymentSettings.Password },
                     { "report_type", "customer_vault" },
-                    { "customer_vault_id", _workContext.CurrentCustomer.GetAttribute<string>(Constants.CustomerVaultIdKey) },
+                    { "customer_vault_id", _genericAttributeService.GetAttribute<string>(_workContext.CurrentCustomer, Constants.CustomerVaultIdKey) },
                     // this is an undocumented variable which will make the API return multiple billings (aka credit cards)
                     { "ver", "2" }
                 };
@@ -105,6 +110,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
             }
             catch (Exception e)
             {
+                _logger.Error("Error parsing xml", e);
                 return null;
             }
         }
