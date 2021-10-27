@@ -74,7 +74,9 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
                 var response = _httpClient.PostAsync(NMI_QUERY_URL, new FormUrlEncodedContent(values)).Result;
                 if (response.IsSuccessStatusCode)
                 {
-                    var nmiQueryResponse = DeserializeXml(response.Content.ReadAsStringAsync().Result);
+                    var content = response.Content.ReadAsStringAsync().Result;
+                    var nmiQueryResponse = DeserializeXml(content);
+
                     if (nmiQueryResponse?.CustomerVault != null)
                     {
                         foreach (var billing in nmiQueryResponse.CustomerVault.Customer.Billing ?? new List<Billing>())
@@ -90,7 +92,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
                     }
                     else
                     {
-                        _logger.Information("No saved cards where found in the response from NMI");
+                        _logger.Warning($"No saved cards where found in the response from NMI, Response: {content}");
                     }
                 }
 
