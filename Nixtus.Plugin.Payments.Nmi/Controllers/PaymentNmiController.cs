@@ -5,6 +5,7 @@ using Nop.Core;
 using Nop.Services;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
+using Nop.Services.Messages;
 using Nop.Services.Security;
 using Nop.Services.Stores;
 using Nop.Web.Framework;
@@ -20,18 +21,22 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
         private readonly IStoreService _storeService;
         private readonly IWorkContext _workContext;
         private readonly IPermissionService _permissionService;
+        private readonly IStoreContext _storeContext;
+        private readonly INotificationService _notificationService;
 
         public PaymentNmiController(ILocalizationService localizationService,
             ISettingService settingService,
             IStoreService storeService,
             IWorkContext workContext,
-            IPermissionService permissionService)
+            IPermissionService permissionService, IStoreContext storeContext, INotificationService notificationService)
         {
             _localizationService = localizationService;
             _settingService = settingService;
             _storeService = storeService;
             _workContext = workContext;
             _permissionService = permissionService;
+            _storeContext = storeContext;
+            _notificationService = notificationService;
         }
 
         [AuthorizeAdmin]
@@ -42,7 +47,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            var storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var nmiPaymentSettings = _settingService.LoadSetting<NmiPaymentSettings>(storeScope);
 
             var model = new ConfigurationModel
@@ -88,7 +93,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
                 return Configure();
 
             //load settings for a chosen store scope
-            var storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var nmiPaymentSettings = _settingService.LoadSetting<NmiPaymentSettings>(storeScope);
 
             //save settings
@@ -118,7 +123,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
             //now clear settings cache
             _settingService.ClearCache();
 
-            SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
 
             return Configure();
         }

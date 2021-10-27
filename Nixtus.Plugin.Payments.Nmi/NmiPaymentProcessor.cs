@@ -11,14 +11,15 @@ using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
-using Nop.Core.Plugins;
 using Nop.Services.Common;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
+using Nop.Services.Directory;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
+using Nop.Services.Plugins;
 
 namespace Nixtus.Plugin.Payments.Nmi
 {
@@ -40,6 +41,8 @@ namespace Nixtus.Plugin.Payments.Nmi
         private readonly NmiPaymentSettings _nmiPaymentSettings;
         private readonly ILocalizationService _localizationService;
         private readonly IGenericAttributeService _genericAttributeService;
+        private readonly IStateProvinceService _stateProvinceService;
+        private readonly IPaymentService _paymentService;
 
         #endregion
 
@@ -51,7 +54,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             IOrderTotalCalculationService orderTotalCalculationService,
             ILogger logger,
             NmiPaymentSettings nmiPaymentSettings,
-            ILocalizationService localizationService, IGenericAttributeService genericAttributeService)
+            ILocalizationService localizationService, IGenericAttributeService genericAttributeService, IStateProvinceService stateProvinceService, IPaymentService paymentService)
         {
             _nmiPaymentSettings = nmiPaymentSettings;
             _settingService = settingService;
@@ -61,6 +64,8 @@ namespace Nixtus.Plugin.Payments.Nmi
             _logger = logger;
             _localizationService = localizationService;
             _genericAttributeService = genericAttributeService;
+            _stateProvinceService = stateProvinceService;
+            _paymentService = paymentService;
         }
 
         #endregion
@@ -110,7 +115,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             var saveCustomer = Convert.ToBoolean(saveCustomerKeySuccess ? saveCustomerKey.ToString() : "false");
             if (_nmiPaymentSettings.AllowCustomerToSaveCards && saveCustomer)
             {
-                var existingCustomerVaultId = customer.GetAttribute<string>(Constants.CustomerVaultIdKey);
+                var existingCustomerVaultId = _genericAttributeService.GetAttribute<string>(customer, Constants.CustomerVaultIdKey);
                 if (string.IsNullOrEmpty(existingCustomerVaultId))
                 {
                     values.Add("customer_vault", "add_customer");
@@ -139,7 +144,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             if (processPaymentRequest.CustomValues.TryGetValue(Constants.StoredCardKey, out object storedCardId) &&
                 !storedCardId.ToString().Equals("0"))
             {
-                var existingCustomerVaultId = customer.GetAttribute<string>(Constants.CustomerVaultIdKey);
+                var existingCustomerVaultId = _genericAttributeService.GetAttribute<string>(customer, Constants.CustomerVaultIdKey);
                 if (!string.IsNullOrEmpty(existingCustomerVaultId))
                 {
                     values.Add("customer_vault_id", existingCustomerVaultId);
@@ -169,17 +174,25 @@ namespace Nixtus.Plugin.Payments.Nmi
         {
             var result = new ProcessPaymentResult();
             var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
+            var billingAddress = _customerService.GetCustomerBillingAddress(customer);
+
+            if (customer == null || billingAddress == null)
+            {
+                throw new NopException("Could not retrieve customer or billing address");
+            }
+
+            var state = _stateProvinceService.GetStateProvinceById(billingAddress.StateProvinceId ?? 0);
 
             var values = new Dictionary<string, string>
             {
                 { "payment", "creditcard" },
                 { "type", _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture ? "sale" : "auth" },
-                { "firstname", customer.BillingAddress.FirstName },
-                { "lastname", customer.BillingAddress.LastName },
-                { "address1", customer.BillingAddress.Address1 },
-                { "city", customer.BillingAddress.City },
-                { "state", customer.BillingAddress.StateProvince.Abbreviation },
-                { "zip", customer.BillingAddress.ZipPostalCode.Substring(0, 5) },
+                { "firstname", billingAddress.FirstName },
+                { "lastname", billingAddress.LastName },
+                { "address1", billingAddress.Address1 },
+                { "city", billingAddress.City },
+                { "state", state?.Abbreviation },
+                { "zip", billingAddress.ZipPostalCode.Substring(0, 5) },
                 { "amount", processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) },
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
@@ -256,9 +269,8 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// <returns>Additional handling fee</returns>
         public decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
         {
-            var result = this.CalculateAdditionalFee(_orderTotalCalculationService, cart,
+            return _paymentService.CalculateAdditionalFee(cart,
                 _nmiPaymentSettings.AdditionalFee, _nmiPaymentSettings.AdditionalFeePercentage);
-            return result;
         }
 
         /// <summary>
@@ -445,6 +457,14 @@ namespace Nixtus.Plugin.Payments.Nmi
             var result = new ProcessPaymentResult();
 
             var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
+            var billingAddress = _customerService.GetCustomerBillingAddress(customer);
+
+            if (customer == null || billingAddress == null)
+            {
+                throw new NopException("Could not retrieve customer or billing address");
+            }
+
+            var state = _stateProvinceService.GetStateProvinceById(billingAddress.StateProvinceId ?? 0);
 
             var orderTotal = processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture);
 
@@ -452,12 +472,12 @@ namespace Nixtus.Plugin.Payments.Nmi
             {
                 { "payment", "creditcard" },
                 { "type", _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture ? "sale" : "auth" },
-                { "firstname", customer.BillingAddress.FirstName },
-                { "lastname", customer.BillingAddress.LastName },
-                { "address1", customer.BillingAddress.Address1 },
-                { "city", customer.BillingAddress.City },
-                { "state", customer.BillingAddress.StateProvince.Abbreviation },
-                { "zip", customer.BillingAddress.ZipPostalCode.Substring(0, 5) },
+                { "firstname", billingAddress.FirstName },
+                { "lastname", billingAddress.LastName },
+                { "address1", billingAddress.Address1 },
+                { "city", billingAddress.City },
+                { "state", state?.Abbreviation },
+                { "zip", billingAddress.ZipPostalCode.Substring(0, 5) },
                 { "amount",  orderTotal },
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
@@ -664,6 +684,11 @@ namespace Nixtus.Plugin.Payments.Nmi
             return $"{_webHelper.GetStoreLocation()}Admin/PaymentNmi/Configure";
         }
 
+        public string GetPublicViewComponentName()
+        {
+            return "Nmi";
+        }
+
         /// <summary>
         /// Install plugin
         /// </summary>
@@ -680,27 +705,27 @@ namespace Nixtus.Plugin.Payments.Nmi
             _settingService.SaveSetting(settings);
 
             //locales
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username", "Username");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username.Hint", "Username assigned to the merchant account");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password", "Password");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password.Hint", "Password assigned to the merchant account");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey", "Security Key");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey.Hint", "API security key assigned to the merchant account, using this combined with username/password will result in an error");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey", "Collect JS Tokenization Key");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey.Hint", "Tokenization key used for Collect.js library");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues", "Transaction mode");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues.Hint", "Choose transaction mode.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee", "Additional fee");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword", "Use username/password");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint", "If enabled username/password will be used for authentication to the payment API instead of the security key");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards", "Allow Customers To Store Cards");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint", "If enabled registered customers will be able to save cards for future use.  Also, you must enter the username/password for this functionality to be available.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription", "Pay by credit / debit card");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer", "Save card information");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard", "Use a previously saved card");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username", "Username");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username.Hint", "Username assigned to the merchant account");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password", "Password");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password.Hint", "Password assigned to the merchant account");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey", "Security Key");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey.Hint", "API security key assigned to the merchant account, using this combined with username/password will result in an error.  If you want to save cards, then select that checkbox and enter username/password");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey", "Collect JS Tokenization Key");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey.Hint", "Tokenization key used for Collect.js library");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues", "Transaction mode");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues.Hint", "Choose transaction mode.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee", "Additional fee");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword", "Use username/password");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint", "If enabled username/password will be used for authentication to the payment API instead of the security key");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards", "Allow Customers To Store Cards");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint", "If enabled registered customers will be able to save cards for future use.  Also, you must enter the username/password for this functionality to be available.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription", "Pay by credit / debit card");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer", "Save card information");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard", "Use a previously saved card");
 
             base.Install();
         }
@@ -714,27 +739,27 @@ namespace Nixtus.Plugin.Payments.Nmi
             _settingService.DeleteSetting<NmiPaymentSettings>();
 
             //locales
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Username.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.Password.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.SecurityKey.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.CollectJsTokenizationKey.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.TransactModeValues.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFee.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseUsernamePassword.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard");
 
             base.Uninstall();
         }
