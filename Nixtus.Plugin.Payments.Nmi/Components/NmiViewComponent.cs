@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Threading.Tasks;
 using System.Xml.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -36,19 +37,28 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
             _genericAttributeService = genericAttributeService;
         }
 
-        public IViewComponentResult Invoke()
+        /// <summary>
+        /// Invoke view component
+        /// </summary>
+        /// <param name="widgetZone">Widget zone name</param>
+        /// <param name="additionalData">Additional data</param>
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the view component result
+        /// </returns>
+        public async Task<IViewComponentResult> InvokeAsync(string widgetZone, object additionalData)
         {
             var model = new PaymentInfoModel
             {
-                IsGuest = _customerService.IsGuest(_workContext.CurrentCustomer),
+                IsGuest = await _customerService.IsGuestAsync(await _workContext.GetCurrentCustomerAsync()),
                 AllowCustomerToSaveCards = _nmiPaymentSettings.AllowCustomerToSaveCards
             };
 
             if (_nmiPaymentSettings.AllowCustomerToSaveCards)
             {
-                if (!string.IsNullOrEmpty(_genericAttributeService.GetAttribute<string>(_workContext.CurrentCustomer, Constants.CustomerVaultIdKey)))
+                if (!string.IsNullOrEmpty(await _genericAttributeService.GetAttributeAsync<string>(await _workContext.GetCurrentCustomerAsync(), Constants.CustomerVaultIdKey)))
                 {
-                    PopulateStoredCards(model);
+                    await PopulateStoredCards(model);
                 }
 
                 model.StoredCards.Insert(0, new SelectListItem { Text = "Select a card...", Value = "0" });
@@ -57,7 +67,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
             return View("~/Plugins/Payments.Nmi/Views/PaymentInfo.cshtml", model);
         }
 
-        private void PopulateStoredCards(PaymentInfoModel model)
+        private async Task PopulateStoredCards(PaymentInfoModel model)
         {
             try
             {
@@ -66,16 +76,16 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
                     { "username", _nmiPaymentSettings.Username },
                     { "password", _nmiPaymentSettings.Password },
                     { "report_type", "customer_vault" },
-                    { "customer_vault_id", _genericAttributeService.GetAttribute<string>(_workContext.CurrentCustomer, Constants.CustomerVaultIdKey) },
+                    { "customer_vault_id", await _genericAttributeService.GetAttributeAsync<string>(await _workContext.GetCurrentCustomerAsync(), Constants.CustomerVaultIdKey) },
                     // this is an undocumented variable which will make the API return multiple billings (aka credit cards)
                     { "ver", "2" }
                 };
 
-                var response = _httpClient.PostAsync(NMI_QUERY_URL, new FormUrlEncodedContent(values)).Result;
+                var response = await _httpClient.PostAsync(NMI_QUERY_URL, new FormUrlEncodedContent(values));
                 if (response.IsSuccessStatusCode)
                 {
-                    var content = response.Content.ReadAsStringAsync().Result;
-                    var nmiQueryResponse = DeserializeXml(content);
+                    var content = await response.Content.ReadAsStringAsync();
+                    var nmiQueryResponse = await DeserializeXml(content);
 
                     if (nmiQueryResponse?.CustomerVault != null)
                     {
@@ -92,18 +102,18 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
                     }
                     else
                     {
-                        _logger.Warning($"No saved cards where found in the response from NMI, Response: {content}");
+                        await _logger.WarningAsync($"No saved cards where found in the response from NMI, Response: {content}");
                     }
                 }
 
             }
             catch (Exception exception)
             {
-                _logger.Error("NMI Error querying customer vault records", exception);
+                await _logger.ErrorAsync("NMI Error querying customer vault records", exception);
             }
         }
 
-        private NmiQueryResponse DeserializeXml(string xml)
+        private async Task<NmiQueryResponse> DeserializeXml(string xml)
         {
             try
             {
@@ -116,7 +126,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
             }
             catch (Exception e)
             {
-                _logger.Error("Error parsing xml", e);
+                await _logger.ErrorAsync("Error parsing xml", e);
                 return null;
             }
         }
