@@ -2,7 +2,7 @@
   "Group": "Payment methods",
   "FriendlyName": "Credit Card",
   "SystemName": "Payments.Nmi",
-  "Version": "1.30",
+  "Version": "1.31",
   "SupportedVersions": ["4.30"],
   "Author": "Nixtus, LLC",
   "DisplayOrder": 1,

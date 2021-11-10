@@ -62,7 +62,8 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
                 TransactModeValues = nmiPaymentSettings.TransactMode.ToSelectList(),
                 AdditionalFee = nmiPaymentSettings.AdditionalFee,
                 AdditionalFeePercentage = nmiPaymentSettings.AdditionalFeePercentage,
-                ActiveStoreScopeConfiguration = storeScope
+                ActiveStoreScopeConfiguration = storeScope,
+                UseNameOnCardField = nmiPaymentSettings.UseNameOnCardField
             };
 
             if (storeScope > 0)
@@ -76,6 +77,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
                 model.TransactModeId_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.TransactMode, storeScope);
                 model.AdditionalFee_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.AdditionalFee, storeScope);
                 model.AdditionalFeePercentage_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
+                model.UseNameOnCardField_OverrideForStore = _settingService.SettingExists(nmiPaymentSettings, x => x.UseNameOnCardField, storeScope);
             }
 
             return View("~/Plugins/Payments.Nmi/Views/Configure.cshtml", model);
@@ -106,6 +108,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
             nmiPaymentSettings.SecurityKey = model.SecurityKey;
             nmiPaymentSettings.CollectJsTokenizationKey = model.CollectJsTokenizationKey;
             nmiPaymentSettings.TransactMode = (TransactMode)model.TransactModeId;
+            nmiPaymentSettings.UseNameOnCardField = model.UseNameOnCardField;
 
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
@@ -119,6 +122,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
             _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.TransactMode, model.TransactModeId_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.UseUsernamePassword, model.UseUsernamePassword_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.AllowCustomerToSaveCards, model.AllowCustomerToSaveCards_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(nmiPaymentSettings, x => x.UseNameOnCardField, model.UseNameOnCardField_OverrideForStore, storeScope, false);
 
             //now clear settings cache
             _settingService.ClearCache();

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 using Nop.Core;
 using Nop.Core.Domain.Catalog;
+using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
@@ -161,6 +162,31 @@ namespace Nixtus.Plugin.Payments.Nmi
                 values.Add("payment_token", processPaymentRequest.CustomValues[Constants.CardToken].ToString());
             }
         }
+
+        /// <summary>
+        /// Add name values based on if the "Name on card" fields are enabled, otherwise use the name from the billing address
+        /// </summary>
+        /// <param name="processPaymentRequest"></param>
+        /// <param name="billingAddress"></param>
+        /// <param name="values"></param>
+        private void AddNameValues(ProcessPaymentRequest processPaymentRequest, Address billingAddress, IDictionary<string, string> values)
+        {
+            // if use name on card is enabled and has values then use that name for the transaction
+            // otherwise use the billing address name
+            if (_nmiPaymentSettings.UseNameOnCardField)
+            {
+                processPaymentRequest.CustomValues.TryGetValue(Constants.FirstNameOnCardKey, out object firstNameValue);
+                processPaymentRequest.CustomValues.TryGetValue(Constants.LastNameOnCardKey, out object lastNameValue);
+
+                values.Add("firstname", firstNameValue.ToString());
+                values.Add("lastname", lastNameValue.ToString());
+            }
+            else
+            {
+                values.Add("firstname", billingAddress.FirstName);
+                values.Add("lastname", billingAddress.LastName);
+            }
+        }
         #endregion
 
         #region Methods
@@ -187,8 +213,6 @@ namespace Nixtus.Plugin.Payments.Nmi
             {
                 { "payment", "creditcard" },
                 { "type", _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture ? "sale" : "auth" },
-                { "firstname", billingAddress.FirstName },
-                { "lastname", billingAddress.LastName },
                 { "address1", billingAddress.Address1 },
                 { "city", billingAddress.City },
                 { "state", state?.Abbreviation },
@@ -196,6 +220,9 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "amount", processPaymentRequest.OrderTotal.ToString("0.00", CultureInfo.InvariantCulture) },
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
+
+            // add name values
+            AddNameValues(processPaymentRequest, billingAddress, values);
 
             // save customer card if needed
             var saveCustomer = AddCustomerVaultValues(processPaymentRequest, customer, values);
@@ -472,8 +499,6 @@ namespace Nixtus.Plugin.Payments.Nmi
             {
                 { "payment", "creditcard" },
                 { "type", _nmiPaymentSettings.TransactMode == TransactMode.AuthorizeAndCapture ? "sale" : "auth" },
-                { "firstname", billingAddress.FirstName },
-                { "lastname", billingAddress.LastName },
                 { "address1", billingAddress.Address1 },
                 { "city", billingAddress.City },
                 { "state", state?.Abbreviation },
@@ -481,6 +506,9 @@ namespace Nixtus.Plugin.Payments.Nmi
                 { "amount",  orderTotal },
                 { "orderid", processPaymentRequest.OrderGuid.ToString() }
             };
+
+            // add name values
+            AddNameValues(processPaymentRequest, billingAddress, values);
 
             // save customer card if needed
             var saveCustomer = AddCustomerVaultValues(processPaymentRequest, customer, values);
@@ -641,11 +669,29 @@ namespace Nixtus.Plugin.Payments.Nmi
             if (form == null)
                 throw new ArgumentException(nameof(form));
 
+            var warnings = new List<string>();
+
+            if (_nmiPaymentSettings.UseNameOnCardField)
+            {
+                var firstName = form["FirstNameOnCard"].ToString();
+                var lastName = form["LastNameOnCard"].ToString();
+
+                if (string.IsNullOrEmpty(firstName))
+                {
+                    warnings.Add("First name cannot be empty");
+                }
+
+                if (string.IsNullOrEmpty(lastName))
+                {
+                    warnings.Add("Last name cannot be empty");
+                }
+            }
+
             //try to get errors
             if (form.TryGetValue("Errors", out StringValues errorsString) && !StringValues.IsNullOrEmpty(errorsString))
-                return new[] { errorsString.ToString() }.ToList();
+                warnings.Add(errorsString.ToString());
 
-            return new List<string>();
+            return warnings;
         }
 
         /// <summary>
@@ -666,6 +712,12 @@ namespace Nixtus.Plugin.Payments.Nmi
 
             if (form.TryGetValue("SaveCustomer", out StringValues saveCustomerValue) && !StringValues.IsNullOrEmpty(saveCustomerValue) && bool.TryParse(saveCustomerValue[0], out bool saveCustomer) && saveCustomer)
                 paymentRequest.CustomValues.Add(Constants.SaveCustomerKey, saveCustomer);
+
+            if (form.TryGetValue("FirstNameOnCard", out StringValues firstNameOnCardValue) && !StringValues.IsNullOrEmpty(firstNameOnCardValue))
+                paymentRequest.CustomValues.Add(Constants.FirstNameOnCardKey, firstNameOnCardValue.ToString());
+
+            if (form.TryGetValue("LastNameOnCard", out StringValues lastNameOnCardValue) && !StringValues.IsNullOrEmpty(lastNameOnCardValue))
+                paymentRequest.CustomValues.Add(Constants.LastNameOnCardKey, lastNameOnCardValue.ToString());
 
             return paymentRequest;
         }
@@ -726,6 +778,10 @@ namespace Nixtus.Plugin.Payments.Nmi
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.PaymentMethodDescription", "Pay by credit / debit card");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.SaveCustomer", "Save card information");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard", "Use a previously saved card");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.FirstNameOnCard", "First name on card");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.LastNameOnCard", "Last name on card");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseNameOnCardField", "Use 'Name on card' field");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseNameOnCardField.Hint", "Enables the 'Name on card' field during the payment checkout, instead of using the customers billing address name");
 
             base.Install();
         }
@@ -760,6 +816,10 @@ namespace Nixtus.Plugin.Payments.Nmi
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards");
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.AllowCustomerToSaveCards.Hint");
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.StoredCard");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.FirstNameOnCard");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.LastNameOnCard");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseNameOnCardField");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Nmi.Fields.UseNameOnCardField.Hint");
 
             base.Uninstall();
         }

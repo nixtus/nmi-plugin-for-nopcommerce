@@ -17,18 +17,39 @@
 @if (!Model.IsGuest && Model.AllowCustomerToSaveCards && Model.StoredCards.Any())
 {
     <table width="100%" cellspacing="2" cellpadding="1" border="0">
-        <tr>
-            <td>
-                <label asp-for="StoredCardId">@T("Plugins.Payments.Nmi.Fields.StoredCard"):</label>
-            </td>
-            <td>
-                <select asp-for="StoredCardId" asp-items="Model.StoredCards" class="nmi-input"></select>
-            </td>
-        </tr>
-    </table>
+    <tr>
+        <td>
+            <label asp-for="StoredCardId">@T("Plugins.Payments.Nmi.Fields.StoredCard"):</label>
+        </td>
+        <td>
+            <select asp-for="StoredCardId" asp-items="Model.StoredCards" class="nmi-input"></select>
+        </td>
+    </tr>
+</table>
 }
 
 <table width="100%" cellspacing="2" cellpadding="1" border="0" id="nmi-card-details">
+    @if (Model.UseNameOnCardField)
+    {
+        <tr>
+            <td>
+                @Html.LabelFor(model => model.FirstNameOnCard, false):
+            </td>
+            <td>
+                <input required type="text" asp-for="FirstNameOnCard" style="width:165px;" autocomplete="off" />
+                <span asp-validation-for="FirstNameOnCard"></span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                @Html.LabelFor(model => model.LastNameOnCard, false):
+            </td>
+            <td>
+                <input required type="text" asp-for="LastNameOnCard" style="width:165px;" autocomplete="off" />
+                <span asp-validation-for="LastNameOnCard"></span>
+            </td>
+        </tr>
+    }
     <tr>
         <td>
             @Html.LabelFor(model => model.CardNumber, false):
@@ -76,7 +97,7 @@
 
 <script>
     var onePageCheckout = @orderSettings.OnePageCheckoutEnabled.ToString().ToLower();
-	var formSubmitted = false;
+    var formSubmitted = false;
 
     function addScript() {
         var s = document.createElement('script');
@@ -92,7 +113,7 @@
                         PaymentInfo.save();
                     } else {
                         formSubmitted = true;
-						$("input.payment-info-next-step-button").click();
+                        $("input.payment-info-next-step-button").click();
                     }
                 },
                 validationCallback: (field, status, message) => {
@@ -118,13 +139,13 @@
 
         $(".payment-info-next-step-button").on('click', (event) => {
             var selectedStoredCardId = $('#@Html.IdFor(model => model.StoredCardId)').val();
-			if (formSubmitted || (selectedStoredCardId && selectedStoredCardId !== '0')) {
-				// add form parameter so that the right action is hit
-				var input = $("<input>").attr("type", "hidden").attr("name", "nextstep").val("Next");
-				$("form[action='/checkout/paymentinfo']").append(input);
-				$("form[action='/checkout/paymentinfo']").submit();
-				return false;
-			}
+            if (formSubmitted || (selectedStoredCardId && selectedStoredCardId !== '0')) {
+                // add form parameter so that the right action is hit
+                var input = $("<input>").attr("type", "hidden").attr("name", "nextstep").val("Next");
+                $("form[action='/checkout/paymentinfo']").append(input);
+                $("form[action='/checkout/paymentinfo']").submit();
+                return false;
+            }
 
             CollectJS.startPaymentRequest(event);
 

@@ -43,5 +43,9 @@ namespace Nixtus.Plugin.Payments.Nmi.Models
         [NopResourceDisplayName("Plugins.Payments.Nmi.Fields.AdditionalFeePercentage")]
         public bool AdditionalFeePercentage { get; set; }
         public bool AdditionalFeePercentage_OverrideForStore { get; set; }
+
+        [NopResourceDisplayName("Plugins.Payments.Nmi.Fields.UseNameOnCardField")]
+        public bool UseNameOnCardField { get; set; }
+        public bool UseNameOnCardField_OverrideForStore { get; set; }
     }
 }

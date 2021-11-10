@@ -12,7 +12,8 @@
             <div class="panel-body">
                 <div class="form-group">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="UseUsernamePassword_OverrideForStore" asp-input="UseUsernamePassword" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-override-store-checkbox asp-for="UseUsernamePassword_OverrideForStore"
+                            asp-input="UseUsernamePassword" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="UseUsernamePassword" />
                     </div>
                     <div class="col-md-9">
@@ -23,7 +24,9 @@
 
                 <div class="form-group">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="AllowCustomerToSaveCards_OverrideForStore" asp-input="AllowCustomerToSaveCards" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-override-store-checkbox asp-for="AllowCustomerToSaveCards_OverrideForStore"
+                            asp-input="AllowCustomerToSaveCards"
+                            asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="AllowCustomerToSaveCards" />
                     </div>
                     <div class="col-md-9">
@@ -34,7 +37,8 @@
 
                 <div class="form-group" id="username">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="Username_OverrideForStore" asp-input="Username" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-override-store-checkbox asp-for="Username_OverrideForStore" asp-input="Username"
+                            asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="Username" />
                     </div>
                     <div class="col-md-9">
@@ -44,7 +48,8 @@
 
                 <div class="form-group" id="password">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="Password_OverrideForStore" asp-input="Password" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-override-store-checkbox asp-for="Password_OverrideForStore" asp-input="Password"
+                            asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="Password" />
                     </div>
                     <div class="col-md-9">
@@ -52,10 +57,11 @@
                         <span asp-validation-for="Password"></span>
                     </div>
                 </div>
-                
+
                 <div class="form-group" id="security-key">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="SecurityKey_OverrideForStore" asp-input="SecurityKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-override-store-checkbox asp-for="SecurityKey_OverrideForStore" asp-input="SecurityKey"
+                            asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="SecurityKey" />
                     </div>
                     <div class="col-md-9">
@@ -66,7 +72,9 @@
 
                 <div class="form-group">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="CollectJsTokenizationKey_OverrideForStore" asp-input="CollectJsTokenizationKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-override-store-checkbox asp-for="CollectJsTokenizationKey_OverrideForStore"
+                            asp-input="CollectJsTokenizationKey"
+                            asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="CollectJsTokenizationKey" />
                     </div>
                     <div class="col-md-9">
@@ -77,7 +85,8 @@
 
                 <div class="form-group">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="TransactModeId_OverrideForStore" asp-input="TransactModeId" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-override-store-checkbox asp-for="TransactModeId_OverrideForStore"
+                            asp-input="TransactModeId" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="TransactModeId" />
                     </div>
                     <div class="col-md-9">
@@ -87,7 +96,8 @@
 
                 <div class="form-group">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="AdditionalFee_OverrideForStore" asp-input="AdditionalFee" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-override-store-checkbox asp-for="AdditionalFee_OverrideForStore" asp-input="AdditionalFee"
+                            asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="AdditionalFee" />
                     </div>
                     <div class="col-md-9">
@@ -98,12 +108,26 @@
 
                 <div class="form-group">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="AdditionalFeePercentage_OverrideForStore" asp-input="AdditionalFeePercentage" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-override-store-checkbox asp-for="AdditionalFeePercentage_OverrideForStore"
+                            asp-input="AdditionalFeePercentage"
+                            asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="AdditionalFeePercentage" />
                     </div>
                     <div class="col-md-9">
                         <nop-editor asp-for="AdditionalFeePercentage" />
                         <span asp-validation-for="AdditionalFeePercentage"></span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="UseNameOnCardField_OverrideForStore"
+                            asp-input="UseNameOnCardField" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="UseNameOnCardField" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="UseNameOnCardField" />
+                        <span asp-validation-for="UseNameOnCardField"></span>
                     </div>
                 </div>
 

@@ -41,7 +41,8 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
             var model = new PaymentInfoModel
             {
                 IsGuest = _customerService.IsGuest(_workContext.CurrentCustomer),
-                AllowCustomerToSaveCards = _nmiPaymentSettings.AllowCustomerToSaveCards
+                AllowCustomerToSaveCards = _nmiPaymentSettings.AllowCustomerToSaveCards,
+                UseNameOnCardField = _nmiPaymentSettings.UseNameOnCardField
             };
 
             if (_nmiPaymentSettings.AllowCustomerToSaveCards)

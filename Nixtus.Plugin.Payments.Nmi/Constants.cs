@@ -7,5 +7,7 @@
         public static string SaveCustomerKey = "Nmi.SaveCustomer";
         public static string CustomerVaultIdKey = "Nmi.Customer.Vault.Id";
         public static string StoredCardKey = "Nmi.StoredCard.Id";
+        public static string FirstNameOnCardKey = "Nmi.FirstNameOnCard";
+        public static string LastNameOnCardKey = "Nmi.LastNameOnCard";
     }
 }

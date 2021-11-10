@@ -34,5 +34,13 @@ namespace Nixtus.Plugin.Payments.Nmi.Models
         public bool IsGuest { get; set; }
 
         public bool AllowCustomerToSaveCards { get; set; }
+
+        [NopResourceDisplayName("Plugins.Payments.Nmi.Fields.FirstNameOnCard")]
+        public string FirstNameOnCard { get; set; }
+
+        [NopResourceDisplayName("Plugins.Payments.Nmi.Fields.LastNameOnCard")]
+        public string LastNameOnCard { get; set; }
+
+        public bool UseNameOnCardField { get; set; }
     }
 }

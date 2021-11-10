@@ -49,5 +49,10 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// Additional fee
         /// </summary>
         public decimal AdditionalFee { get; set; }
+
+        /// <summary>
+        /// Enable the "Name on Card" field on the UI during checkout
+        /// </summary>
+        public bool UseNameOnCardField { get; set; }
     }
 }
