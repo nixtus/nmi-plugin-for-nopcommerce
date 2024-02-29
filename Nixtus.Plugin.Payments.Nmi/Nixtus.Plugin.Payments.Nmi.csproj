@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <Copyright>Copyright © Nixtus, LLC</Copyright> 
     <Company>Nixtus, LLC</Company> 
     <Authors>Nixtus, LLC</Authors> 
-    <Version>1.30</Version> 
+    <Version>1.60</Version> 
     <Description>This plugin allows paying with NMI (Network Merchants Inc)</Description> 
     <PackageLicenseUrl></PackageLicenseUrl> 
     <PackageProjectUrl></PackageProjectUrl> 
