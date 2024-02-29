@@ -30,7 +30,7 @@ namespace Nixtus.Plugin.Payments.Nmi
     /// </summary>
     public class NmiPaymentProcessor : BasePlugin, IPaymentMethod
     {
-        private const string NMI_DIRECT_POST_URL = "https://msgpay.transactiongateway.com/api/transact.php";
+        private const string NMI_DIRECT_POST_URL = "https://secure.nmi.com/api/transact.php";
         private HttpClient _httpClient = new HttpClient();
 
         #region Fields
@@ -44,7 +44,6 @@ namespace Nixtus.Plugin.Payments.Nmi
         private readonly ILocalizationService _localizationService;
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly IStateProvinceService _stateProvinceService;
-        private readonly IPaymentService _paymentService;
 
         #endregion
 
@@ -56,7 +55,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             IOrderTotalCalculationService orderTotalCalculationService,
             ILogger logger,
             NmiPaymentSettings nmiPaymentSettings,
-            ILocalizationService localizationService, IGenericAttributeService genericAttributeService, IStateProvinceService stateProvinceService, IPaymentService paymentService)
+            ILocalizationService localizationService, IGenericAttributeService genericAttributeService, IStateProvinceService stateProvinceService)
         {
             _nmiPaymentSettings = nmiPaymentSettings;
             _settingService = settingService;
@@ -67,7 +66,6 @@ namespace Nixtus.Plugin.Payments.Nmi
             _localizationService = localizationService;
             _genericAttributeService = genericAttributeService;
             _stateProvinceService = stateProvinceService;
-            _paymentService = paymentService;
         }
 
         #endregion

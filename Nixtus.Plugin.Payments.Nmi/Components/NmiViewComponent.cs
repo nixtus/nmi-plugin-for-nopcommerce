@@ -25,7 +25,7 @@ namespace Nixtus.Plugin.Payments.Nmi.Components
         private readonly ICustomerService _customerService;
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly HttpClient _httpClient = new HttpClient();
-        private const string NMI_QUERY_URL = "https://msgpay.transactiongateway.com/api/query.php";
+        private const string NMI_QUERY_URL = "https://secure.nmi.com/api/query.php";
 
         public NmiViewComponent(IWorkContext workContext, ILogger logger, NmiPaymentSettings nmiPaymentSettings,
             ICustomerService customerService, IGenericAttributeService genericAttributeService)
