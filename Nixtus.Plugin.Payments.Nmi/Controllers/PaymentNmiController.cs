@@ -8,7 +8,6 @@ using Nop.Services.Configuration;
 using Nop.Services.Localization;
 using Nop.Services.Messages;
 using Nop.Services.Security;
-using Nop.Services.Stores;
 using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc.Filters;
@@ -22,22 +21,16 @@ namespace Nixtus.Plugin.Payments.Nmi.Controllers
     {
         private readonly ILocalizationService _localizationService;
         private readonly ISettingService _settingService;
-        private readonly IStoreService _storeService;
-        private readonly IWorkContext _workContext;
         private readonly IPermissionService _permissionService;
         private readonly IStoreContext _storeContext;
         private readonly INotificationService _notificationService;
 
         public PaymentNmiController(ILocalizationService localizationService,
             ISettingService settingService,
-            IStoreService storeService,
-            IWorkContext workContext,
             IPermissionService permissionService, IStoreContext storeContext, INotificationService notificationService)
         {
             _localizationService = localizationService;
             _settingService = settingService;
-            _storeService = storeService;
-            _workContext = workContext;
             _permissionService = permissionService;
             _storeContext = storeContext;
             _notificationService = notificationService;

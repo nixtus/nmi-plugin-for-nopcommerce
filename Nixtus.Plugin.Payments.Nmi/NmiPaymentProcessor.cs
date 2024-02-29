@@ -21,6 +21,7 @@ using Nop.Services.Logging;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Plugins;
+using Nixtus.Plugin.Payments.Nmi.Components;
 
 namespace Nixtus.Plugin.Payments.Nmi
 {
@@ -277,7 +278,7 @@ namespace Nixtus.Plugin.Payments.Nmi
         /// </returns>
         public async Task<decimal> GetAdditionalHandlingFeeAsync(IList<ShoppingCartItem> cart)
         {
-            return await _paymentService.CalculateAdditionalFeeAsync(cart,
+            return await _orderTotalCalculationService.CalculatePaymentAdditionalFeeAsync(cart,
                 _nmiPaymentSettings.AdditionalFee, _nmiPaymentSettings.AdditionalFeePercentage);
         }
 
@@ -751,7 +752,7 @@ namespace Nixtus.Plugin.Payments.Nmi
             await _settingService.SaveSettingAsync(settings);
 
             //locales
-            await _localizationService.AddLocaleResourceAsync(new Dictionary<string, string>
+            await _localizationService.AddOrUpdateLocaleResourceAsync(new Dictionary<string, string>
             {
                 ["Plugins.Payments.Nmi.Fields.Username"] = "Username",
                 ["Plugins.Payments.Nmi.Fields.Username.Hint"] = "Username assigned to the merchant account",
@@ -805,6 +806,11 @@ namespace Nixtus.Plugin.Payments.Nmi
         public async Task<string> GetPaymentMethodDescriptionAsync()
         {
             return await _localizationService.GetResourceAsync("Plugins.Payments.Nmi.PaymentMethodDescription");
+        }
+
+        public Type GetPublicViewComponent()
+        {
+            return typeof(NmiViewComponent);
         }
 
         #endregion
